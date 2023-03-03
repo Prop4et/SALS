@@ -419,7 +419,11 @@ int main( void )
     double previous_hum = -400;
     double previous_press = -400;
     uint8_t current_op_mode = 0;
-    lorawan_process_timeout_ms(5000);
+    lorawan_join();
+
+    while (!lorawan_is_joined()) {
+        lorawan_process();
+    }
     conf_bsec.next_call = BME68X_SLEEP_MODE;
     // loop forever
     while (1) {
@@ -436,7 +440,9 @@ int main( void )
         
             switch(conf_bsec.op_mode){
                 case BME68X_FORCED_MODE:
+                #ifdef DEBUG
                     printf("--------------Forced Mode--------------\n");
+                #endif
                     rslt_api = bme68x_get_conf(&conf, &bme);
                     check_rslt_api(rslt_api, "bme68x_get_conf");
                     conf.os_hum = conf_bsec.humidity_oversampling;
@@ -459,7 +465,9 @@ int main( void )
                     break;
                 case BME68X_PARALLEL_MODE:
                     if (current_op_mode != conf_bsec.op_mode){
+                    #ifdef DEBUG
                         printf("--------------Parallel Mode--------------\n");
+                    #endif
                         rslt_api = bme68x_get_conf(&conf, &bme);
                         check_rslt_api(rslt_api, "bme68x_get_conf");
                         conf.os_hum = conf_bsec.humidity_oversampling;
@@ -486,7 +494,9 @@ int main( void )
                     break;
                 case BME68X_SLEEP_MODE:
                     if (current_op_mode != conf_bsec.op_mode){
+                    #ifdef DEBUG
                         printf("--------------Sleep Mode--------------\n");
+                    #endif
                         rslt_api = bme68x_set_op_mode(BME68X_SLEEP_MODE, &bme); 
                         current_op_mode = BME68X_SLEEP_MODE;
                     }
@@ -494,9 +504,6 @@ int main( void )
             }
 
             if(conf_bsec.trigger_measurement && conf_bsec.op_mode != BME68X_SLEEP_MODE){
-                #ifdef DEBUG
-                    printf("----------------Forced Mode-----------------\n");
-                #endif
                 if(conf_bsec.op_mode == BME68X_FORCED_MODE){
                     del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
                     bme.delay_us(del_period, bme.intf_ptr);
@@ -530,7 +537,7 @@ int main( void )
                                 if(sent_time >= INTERVAL){
                                     make_pkt(&pkt, output, 6);
                                     secs = 55;
-                                    #ifdef DEBUG
+                                #ifdef DEBUG
                                     printf("\n");
                                     if (lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) < 0) {
                                         printf("failed!!!\n");
@@ -562,7 +569,9 @@ int main( void )
                 //CLASS A sensor should never be in PARALLEL MODE
             }
         }else{
-            printf("Didn't slept enough\n");
+        #ifdef DEBUG
+            printf("Didn't sleep enough\n");
+        #endif
         }
         //set the source to get the oscillator
         //sleep_run_from_xosc();
