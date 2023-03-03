@@ -11,9 +11,11 @@ CTestTestfile.cmake
 _deps
 
 build/
-lora_sensor/bme/bsec/*
-!lora_sensor/bme/bsec/CMakeLists.txt
-!lora_sensor/bme/bsec/README.md
-lora_sensor/lora-config.h
+src/bme/bsec/*
+!src/bme/bsec/CMakeLists.txt
+!src/bme/bsec/README.md
+src/class-a/lora-config.h
+src/class-c/lora-config.h
+
 .vscode
 putty.log
