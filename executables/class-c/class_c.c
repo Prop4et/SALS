@@ -16,17 +16,20 @@
 
 
 #include "pico/stdlib.h"
+#include "pico/lorawan.h"
 #include "../lib/bme/bme68x/bme68x.h"
 #include "../lib/bme/bme_api/bme68x_API.h"
 #include "../lib/bme/bsec/bsec_datatypes.h"
 #include "../lib/bme/bsec/bsec_interface.h"
 
-//fs
-//#include "littlefs-lib/pico_hal.h"
+//littlefs
+#include "pico_hal.h"
+
 #include "sd_card.h"
 #include "ff.h"
 
 // edit with LoRaWAN Node Region and ABP settings 
+#include "lora-config.h"
 #include "bme-config.h"
 #include "hardware/watchdog.h"
 
@@ -41,6 +44,50 @@ static uint scb_orig;
 static uint clock0_orig;
 static uint clock1_orig;
 
+/* 
+    pin configuration for SX1262 radio module
+*/
+const struct lorawan_sx12xx_settings sx12xx_settings = {
+    .spi = {
+        .inst = spi1,
+        .mosi = 11,
+        .miso = 12,
+        .sck  = 10,
+        .nss = 3
+    },
+    .reset = 15,
+    .busy = 2,
+    .dio1 = 20
+};
+
+/*
+    ABP settings
+*/ 
+const struct lorawan_abp_settings abp_settings = {
+    .device_address = LORAWAN_DEV_ADDR,
+    .network_session_key = LORAWAN_NETWORK_SESSION_KEY,
+    .app_session_key = LORAWAN_APP_SESSION_KEY,
+    .channel_mask = LORAWAN_CHANNEL_MASK
+};
+
+/*
+    variables for receiving lora downlinks (if any)
+*/
+int receive_length = 0;
+uint8_t receive_buffer[242];
+uint8_t receive_port = 0;
+
+/*
+    Structure of the uplink, total of 12 Bytes
+*/
+struct uplink {
+    uint16_t id; 
+    uint16_t p1;
+    uint16_t p2;
+    uint16_t p3;
+    uint16_t p4;
+};
+
 //measurements basically
 bsec_sensor_configuration_t requested_virtual_sensors[REQUESTED_OUTPUT];
 uint8_t n_requested_virtual_sensors = REQUESTED_OUTPUT;
@@ -50,22 +97,19 @@ uint8_t n_required_sensor_settings = BSEC_MAX_PHYSICAL_SENSOR;
 //configuration coming from bsec
 bsec_bme_settings_t conf_bsec;
 
-//getting state variables
-uint8_t serialized_state_in[BSEC_MAX_PROPERTY_BLOB_SIZE];
-uint32_t n_serialized_state_in = BSEC_MAX_PROPERTY_BLOB_SIZE;
-uint8_t work_buffer_state_in[BSEC_MAX_WORKBUFFER_SIZE];
-uint32_t n_work_buffer_size_in = BSEC_MAX_WORKBUFFER_SIZE;
-//saving state variables
-uint8_t serialized_state_out[BSEC_MAX_STATE_BLOB_SIZE];
-uint32_t n_serialized_state_max_out = BSEC_MAX_STATE_BLOB_SIZE;
-uint32_t n_serialized_state_out = BSEC_MAX_STATE_BLOB_SIZE;
-uint8_t work_buffer_state_out[BSEC_MAX_WORKBUFFER_SIZE];
-uint32_t n_work_buffer_size_out = BSEC_MAX_WORKBUFFER_SIZE;
-//configuration on shut down
+//state to save
+uint8_t serialized_state[BSEC_MAX_STATE_BLOB_SIZE];
+uint32_t n_serialized_state_max = BSEC_MAX_STATE_BLOB_SIZE;
+uint32_t n_serialized_state = BSEC_MAX_STATE_BLOB_SIZE;
+uint8_t work_buffer_state[BSEC_MAX_WORKBUFFER_SIZE];
+uint32_t n_work_buffer_size = BSEC_MAX_WORKBUFFER_SIZE;
+
+//settings to load
 uint8_t serialized_settings[BSEC_MAX_PROPERTY_BLOB_SIZE];
 uint32_t n_serialized_settings_max = BSEC_MAX_PROPERTY_BLOB_SIZE;
 uint8_t work_buffer[BSEC_MAX_WORKBUFFER_SIZE];
 uint32_t n_work_buffer = BSEC_MAX_WORKBUFFER_SIZE;
+uint32_t n_serialized_settings = 0;
 /*
     File System variables
 */
@@ -99,6 +143,8 @@ void software_reset()
  * @param accuracy accuracy of the data
  */
 void print_results(int id, float signal, int accuracy);
+
+void add_probabilites(struct uplink* pkt, int id, float signal);
 
 uint8_t processData(int64_t currTimeNs, const struct bme68x_data data, bsec_input_t* inputs){
     uint8_t n_input = 0;
@@ -151,9 +197,17 @@ int main( void )
     
     uint8_t not_sent_loops = 0;
     uint32_t last_saved = 0;
+
     /*
         PKT AND CONSTANT VALUES
     */
+    struct uplink pkt = {
+        .id = DEV_ID,
+        .p1 = 0,
+        .p2 = 0,
+        .p3 = 0,
+        .p4 = 0,
+    };   
     //
     uint32_t time_us;
     /*
@@ -342,7 +396,7 @@ int main( void )
         printf("Opened state\n");
 
         if(fr == FR_OK){
-            fr = f_read(&fil, serialized_state_in, BSEC_MAX_WORKBUFFER_SIZE*sizeof(uint8_t), &bread);
+            fr = f_read(&fil, serialized_state, BSEC_MAX_WORKBUFFER_SIZE*sizeof(uint8_t), &bread);
             if(fr != FR_OK){
             #ifdef DEBUG
                 printf("Error reading the file\n");
@@ -369,7 +423,7 @@ int main( void )
     #ifdef DEBUG
         printf("...resuming the state, read %d bytes\n", bread);
     #endif
-        bsec_set_state(serialized_state_in, n_serialized_state_in, work_buffer_state_in, n_work_buffer_size_in);
+        bsec_set_state(serialized_state, n_serialized_state, work_buffer_state, n_work_buffer_size);
         check_rslt_bsec( rslt_bsec, "BSEC_SET_STATE");
     }
 
@@ -382,11 +436,53 @@ int main( void )
     // Call bsec_update_subscription() to enable/disable the requested virtual sensors
     rslt_bsec = bsec_update_subscription(requested_virtual_sensors, n_requested_virtual_sensors, required_sensor_settings, &n_required_sensor_settings);
     check_rslt_bsec( rslt_bsec, "BSEC_UPDATE_SUBSCRIPTION");
-    uint8_t current_op_mode = BME68X_SLEEP_MODE;
 
+    #ifdef DEBUG
+    lorawan_debug(true);
+    printf("Pico LoRaWAN - lora and bme sensor\n\n");
+    printf("Erasing NVM ... ");
+    
+    if (lorawan_erase_nvm() < 0) {
+        printf("failed!!!\n");
+    } else {
+        printf("success!\n");
+    }
+#else 
+    if (lorawan_erase_nvm() < 0) {
+        blink();
+    } 
+#endif
+
+    // initialize the LoRaWAN stack
+#ifdef DEBUG
+    printf("Initilizating LoRaWAN ... ");
+#endif
+    if (lorawan_init_abp(&sx12xx_settings, LORAWAN_REGION, &abp_settings) < 0) {
+    #ifdef DEBUG
+        printf("Fail, restarting\n");
+    #endif
+        software_reset();
+
+    }
+#ifdef DEBUG
+    else {
+        printf("Success!\n");
+    }
+#endif
+    /*initialize state for temp/hum/press with impossible values*/
+    double previous_temp = -400;
+    double previous_hum = -400;
+    double previous_press = -400;
+    uint8_t current_op_mode = 0;
+    lorawan_join();
+
+    while (!lorawan_is_joined()) {
+        lorawan_process();
+    }
+    conf_bsec.next_call = BME68X_SLEEP_MODE;
+    uint8_t number_samples = 0;
     // loop forever
-    uint32_t sleep_time = 0;
-    uint64_t start_time = time_us_64();
+    uint64_t last_send_time = 0; 
     while (1) {
         uint8_t nFieldsLeft = 0;
         uint64_t currTimeNs = time_us_64()*1000;
@@ -452,42 +548,34 @@ int main( void )
                         printf("--------------Sleep Mode--------------\n");
                         rslt_api = bme68x_set_op_mode(BME68X_SLEEP_MODE, &bme); 
                         current_op_mode = BME68X_SLEEP_MODE;
+                        if(number_samples > 0 && (time_us_64() - last_send_time) > 3000000){
+                            pkt.p1 /= number_samples;
+                            pkt.p2 /= number_samples;
+                            pkt.p3 /= number_samples;
+                            pkt.p4 /= number_samples;
+                        #ifdef DEBUG
+                            printf("\n");
+                            if (lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) < 0) {
+                                printf("failed!!!\n");
+                            } else {
+                                printf("success!\n");
+                            }
+                        #else
+                            lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) >= 0
+                        #endif
+                            
+                        }
+                        pkt.p1 = 0;
+                        pkt.p2 = 0;
+                        pkt.p3 = 0;
+                        pkt.p4 = 0;
                     }
                     break;
             }
 
             if(conf_bsec.trigger_measurement && conf_bsec.op_mode != BME68X_SLEEP_MODE){
-                if(conf_bsec.op_mode == BME68X_FORCED_MODE){
-                    del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
-                    bme.delay_us(del_period, bme.intf_ptr);
-                    rslt_api = bme68x_get_op_mode(&current_op_mode, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_op_mode");
-                    while (current_op_mode == BME68X_FORCED_MODE){
-                        delay_us(5 * 1000, bme.intf_ptr);
-                        rslt_api = bme68x_get_op_mode(&current_op_mode, &bme);
-                    }
-                    rslt_api = bme68x_get_data(BME68X_FORCED_MODE, data, &n_fields, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_data");
-                    if(data[0].status & BME68X_GASM_VALID_MSK){
-                        uint8_t n_input = 0;
-                        bsec_input_t inputs[BSEC_MAX_PHYSICAL_SENSOR];
-                        n_input = processData(currTimeNs, data[0], inputs);
-                        if(n_input > 0){
-                            uint8_t n_output = REQUESTED_OUTPUT;
-                            bsec_output_t output[BSEC_NUMBER_OUTPUTS];
-                            memset(output, 0, sizeof(output));
-                            rslt_bsec = bsec_do_steps(inputs, n_input, output, &n_output);
-                            if(rslt_bsec == BSEC_OK){
-                                for(uint8_t  i = 0; i < n_output; i++){
-                                #ifdef DEBUG
-                                    print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
-                                #endif
-                                }
-                            }
-                        }
-                    }
-                }
-
+                //CLASS C sensor should never be in FORCED MODE
+                
                 if(conf_bsec.op_mode == BME68X_PARALLEL_MODE){
                     del_period = bme68x_get_meas_dur(BME68X_PARALLEL_MODE, &conf, &bme) + (heatr_conf.shared_heatr_dur * 1000);
                     bme.delay_us(del_period, bme.intf_ptr);
@@ -512,6 +600,7 @@ int main( void )
                                     #ifdef DEBUG
                                         print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
                                     #endif
+                                    add_probabilites(&pkt, output[i].sensor_id, output[i].signal);
                                     }
                                 }
                             }
@@ -521,11 +610,32 @@ int main( void )
             }
         }
         
-        /*sleep_run_from_xosc();
-        rtc_sleep(3, 0, 0);*/
+        if (lorawan_process() == 0) { 
+            // check if a downlink message was received
+            receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
+        }
     }
     save_state_file();
     return 0;
+}
+
+void add_probabilites(struct uplink* pkt, int id, float signal){
+    switch(id){
+        case BSEC_OUTPUT_GAS_ESTIMATE_1:
+            pkt->p1 += signal;
+            break;
+        case BSEC_OUTPUT_GAS_ESTIMATE_2:
+            pkt->p2 += signal;
+            break;
+        case BSEC_OUTPUT_GAS_ESTIMATE_3:
+            pkt->p3 += signal;
+            break;
+        case BSEC_OUTPUT_GAS_ESTIMATE_4:
+            pkt->p4 += signal;
+            break;
+        default:
+            break;
+    }
 }
 
 //utility to print results
@@ -633,9 +743,9 @@ void save_state_file(){
             printf("ERROR: Could not create file (%d)\r\n", fr);
             blink();
     }
-    rslt_bsec = bsec_get_state(0, serialized_state_out, n_serialized_state_max_out, work_buffer_state_out, n_work_buffer_size_out, &n_serialized_state_out);
+    rslt_bsec = bsec_get_state(0, serialized_state, n_serialized_state_max, work_buffer_state, n_work_buffer_size, &n_serialized_state);
     check_rslt_bsec(rslt_bsec, "BSEC_GET_STATE");
-    fr = f_write(&fil, serialized_state_out, BSEC_MAX_PROPERTY_BLOB_SIZE*sizeof(uint8_t), &bwritten);
+    fr = f_write(&fil, serialized_state, BSEC_MAX_PROPERTY_BLOB_SIZE*sizeof(uint8_t), &bwritten);
     if(fr != FR_OK){
             printf("ERROR: Could not write file (%d)\r\n", fr);
             blink();
