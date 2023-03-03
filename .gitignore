@@ -14,8 +14,8 @@ build/
 executables/lib/bme/bsec/*
 !executables/lib/bme/bsec/CMakeLists.txt
 !executables/lib/bme/bsec/README.md
-src/class-a/lora-config.h
-src/class-c/lora-config.h
+executables/class-a/lora-config.h
+executables/class-c/lora-config.h
 
 .vscode
 putty.log
