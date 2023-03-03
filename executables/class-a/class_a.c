@@ -21,10 +21,10 @@
 
 #include "pico/stdlib.h"
 #include "pico/lorawan.h"
-#include "../bme/bme68x/bme68x.h"
-#include "../bme/bme_api/bme68x_API.h"
-#include "../bme/bsec/bsec_datatypes.h"
-#include "../bme/bsec/bsec_interface.h"
+#include "../lib/bme/bme68x/bme68x.h"
+#include "../lib/bme/bme_api/bme68x_API.h"
+#include "../lib/bme/bsec/bsec_datatypes.h"
+#include "../lib/bme/bsec/bsec_interface.h"
 //littlefs
 #include "pico_hal.h"
 
@@ -540,19 +540,22 @@ int main( void )
                                 #ifdef DEBUG
                                     printf("\n");
                                     if (lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) < 0) {
+                                        sent_time += 1;
                                         printf("failed!!!\n");
                                     } else {
                                         printf("success!\n");
                                     }
                                 #else
-                                    lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2);
+                                    if(lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) >= 0)
+                                        sent_time += 1;
                                 #endif
                                     sent_time = 0;
                                     if (lorawan_process_timeout_ms(3000) == 0) { //downlink windows for class A of 1 and 2 secs
                                         // check if a downlink message was received
                                         receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                     }
-                                }
+                                }else
+                                    sent_time += 1;
                             }
                         }
                     }
