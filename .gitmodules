@@ -1,0 +1,9 @@
+[submodule "lib/no-OS-FatFS-SD-SPI-RPi-Pico"]
+	path = lib/no-OS-FatFS-SD-SPI-RPi-Pico
+	url = https://github.com/carlk3/no-OS-FatFS-SD-SPI-RPi-Pico.git
+[submodule "lib/LoRaMac-node"]
+	path = lib/LoRaMac-node
+	url = https://github.com/Prop4et/LoRaMac-node.git
+[submodule "lib/littlefs-lib"]
+	path = lib/littlefs-lib
+	url = https://github.com/lurk101/littlefs-lib.git
