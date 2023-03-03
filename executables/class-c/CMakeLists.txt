@@ -16,7 +16,7 @@ endif()
 SET_TARGET_PROPERTIES(bsec PROPERTIES LINKER_LANGUAGE C)
 
 add_library(algobsec STATIC IMPORTED)
-set_property(TARGET algobsec PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../bme/bsec/libalgobsec.a)
+set_property(TARGET algobsec PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../lib/bme/bsec/libalgobsec.a)
 
 
 target_link_libraries(class-c 

@@ -1,0 +1,2 @@
+add_subdirectory(bme)
+SET_TARGET_PROPERTIES(bsec PROPERTIES LINKER_LANGUAGE C)

@@ -184,3 +184,4 @@ target_link_libraries(littlefs-lib INTERFACE
 add_definitions(-Dsx126x)
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/executables)
+

@@ -11,9 +11,9 @@ CTestTestfile.cmake
 _deps
 
 build/
-local_lib/bme/bsec/*
-!local_lib/bme/bsec/CMakeLists.txt
-!local_lib/bme/bsec/README.md
+executables/lib/bme/bsec/*
+!executables/lib/bme/bsec/CMakeLists.txt
+!executables/lib/bme/bsec/README.md
 src/class-a/lora-config.h
 src/class-c/lora-config.h
 
