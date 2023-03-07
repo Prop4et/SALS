@@ -424,7 +424,7 @@ int main( void )
     while (!lorawan_is_joined()) {
         lorawan_process();
     }
-    conf_bsec.next_call = BME68X_SLEEP_MODE;
+    conf_bsec.next_call = 0;
     // loop forever
     save_state_file();
     while (1) {
@@ -432,8 +432,8 @@ int main( void )
         uint64_t currTimeNs = time_us_64()*1000;
         current_op_mode = conf_bsec.op_mode;
         //main loop operations
-        if(currTimeNs >= conf_bsec.next_call){ //this one needs to be changed somehow i don't know how to handle timers
-            rslt_bsec = bsec_sensor_control(currTimeNs, &conf_bsec); //this one is cheating
+        if(conf_bsec.next_call >= conf_bsec.next_call){ //this one needs to be changed somehow i don't know how to handle timers
+            rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); //this one is cheating
             //rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); //this one is cheating
             check_rslt_bsec(rslt_bsec, "BSEC_SENSOR_CONTROL");
             if(rslt_bsec != BSEC_OK)
@@ -571,7 +571,9 @@ int main( void )
                     printf("Increasing saved time %u\n", saved_time);
                     after_time = time_us_64();
                     secs = secs - (after_time-before_time)/1000000;
-                    sleep_ms(298000 - (after_time-before_time)/1000);
+                    //sleep_ms(298000 - (after_time-before_time)/1000);
+                    sleep_run_from_xosc();
+                    rtc_sleep(secs, 4, 0);
                 }
                 //CLASS A sensor should never be in PARALLEL MODE
             }
@@ -583,9 +585,9 @@ int main( void )
     #endif
 
         //set the source to get the oscillator
-        //sleep_run_from_xosc();
+        sleep_run_from_xosc();
         //typical sleep duration is 298 seconds for ULP -> 4 minutes and 58 seconds, need to subtract time from 58 in case of other operations
-        //rtc_sleep(secs, mins, 0);
+        rtc_sleep(secs, mins, 0);
     }
 
     return 0;
