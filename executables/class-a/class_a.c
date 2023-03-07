@@ -253,8 +253,8 @@ int main( void )
     uint8_t n_fields;
     uint32_t del_period;
 
-    uint64_t sent_time = 601;
-    uint64_t saved_time = 0;
+    uint8_t sent_time = INTERVAL;
+    uint8_t saved_time = 0;
     uint64_t before_time = 0;
     uint64_t after_time = 0;
         
@@ -426,6 +426,7 @@ int main( void )
     }
     conf_bsec.next_call = BME68X_SLEEP_MODE;
     // loop forever
+    save_state_file();
     while (1) {
         uint8_t nFieldsLeft = 0;
         uint64_t currTimeNs = time_us_64()*1000;
@@ -525,14 +526,14 @@ int main( void )
                             memset(output, 0, sizeof(output));
                             rslt_bsec = bsec_do_steps(inputs, n_input, output, &n_output);
                             if(rslt_bsec == BSEC_OK){
+                            #ifdef DEBUG
+                                printf("------------------Results------------------\n");
                                 for(uint8_t  i = 0; i < n_output; i++){
-                                #ifdef DEBUG
                                     print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
-                                #endif
                                 }
-                                #ifdef DEBUG
-                                    sleep_ms(50);
-                                #endif
+                                printf("--------------------------------------------\n");
+                                sleep_ms(50);
+                            #endif
                                 before_time = time_us_64();
                                 if(sent_time >= INTERVAL){
                                     make_pkt(&pkt, output, 6);
@@ -554,8 +555,10 @@ int main( void )
                                         // check if a downlink message was received
                                         receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                     }
-                                }else
+                                }else{
                                     sent_time += 1;
+                                    printf("Increasing sent time: %u\n", sent_time);
+                                }
                             }
                         }
                     }
@@ -565,17 +568,20 @@ int main( void )
                         saved_time = 0;
                     }
                     saved_time += 1;
+                    printf("Increasing saved time %u\n", saved_time);
                     after_time = time_us_64();
                     secs = secs - (after_time-before_time)/1000000;
                     sleep_ms(298000 - (after_time-before_time)/1000);
                 }
                 //CLASS A sensor should never be in PARALLEL MODE
             }
-        }else{
-        #ifdef DEBUG
+        } 
+    #ifdef DEBUG
+        else{
             printf("Didn't sleep enough\n");
-        #endif
         }
+    #endif
+
         //set the source to get the oscillator
         //sleep_run_from_xosc();
         //typical sleep duration is 298 seconds for ULP -> 4 minutes and 58 seconds, need to subtract time from 58 in case of other operations
