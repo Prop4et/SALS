@@ -271,6 +271,14 @@ int lorawan_join()
     return 0;
 }
 
+int lorawan_join_C()
+{
+    OnClassChange(CLASS_C);
+    LmHandlerJoin( );
+
+    return 0;
+}
+
 int lorawan_is_joined()
 {
     return (LmHandlerJoinStatus() == LORAMAC_HANDLER_SET);
