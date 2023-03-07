@@ -474,7 +474,7 @@ int main( void )
     double previous_hum = -400;
     double previous_press = -400;
     uint8_t current_op_mode = 0;
-    lorawan_join();
+    lorawan_join_C();
 
     while (!lorawan_is_joined()) {
         lorawan_process();
