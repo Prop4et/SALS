@@ -26,7 +26,7 @@
 #define LORAWAN_CHANNEL_MASK            NULL
 
 #ifdef DEBUG 
-    #define INTERVAL          600  /*time between lora send in seconds*/
+    #define INTERVAL          12  /*time between lora send in seconds*/
 #else
     #define INTERVAL          3600 
 #endif
