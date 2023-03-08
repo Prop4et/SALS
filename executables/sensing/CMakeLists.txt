@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.12)
 # rest of your project
 add_executable(sensing
   sensing.c
-  hw_config.c
 )
 
 option(USE_DEBUG "Enter debug mode" OFF)
@@ -21,9 +20,9 @@ target_link_libraries(sensing
     bme_api
     bsec
     pico_stdlib
+    littlefs-lib
     hardware_i2c
     algobsec
-    FatFs_SPI
     pico_runtime  
 )
 
