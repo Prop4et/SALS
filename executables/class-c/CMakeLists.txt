@@ -26,7 +26,6 @@ target_link_libraries(class-c
   hardware_i2c
   algobsec
   littlefs-lib
-  FatFs_SPI
   pico_stdio_usb
   hardware_rtc
   hardware_sleep
