@@ -1,7 +1,5 @@
 #include "bme68x_API.h"
-#ifdef DEBUG
 #include <stdio.h>
-#endif
 
 
 static uint8_t dev_addr;
