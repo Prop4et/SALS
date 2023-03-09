@@ -83,7 +83,7 @@ uint8_t receive_port = 0;
 */
 struct uplink {
     uint16_t id; 
-    uint16_t temp; //-273.15 - 90.00 -> -27315 - 9000
+    int16_t temp; //-273.15 - 90.00 -> -27315 - 9000
     uint16_t hum; //0.00 - 100.00 -> 0 - 10000
     uint16_t press; //840.0 - 1013.25 [hPa] -> 8400 - 10133
     uint16_t AQI; //50.0 - 500.0 -> 500 - 5000
@@ -424,6 +424,7 @@ int main( void )
     while (!lorawan_is_joined()) {
         lorawan_process();
     }
+    lorawan_process_timeout_ms(10000);
     conf_bsec.next_call = 0;
     // loop forever
     save_state_file();
@@ -432,7 +433,7 @@ int main( void )
         uint64_t currTimeNs = time_us_64()*1000;
         current_op_mode = conf_bsec.op_mode;
         //main loop operations
-        if(conf_bsec.next_call >= conf_bsec.next_call){ //this one needs to be changed somehow i don't know how to handle timers
+        if(conf_bsec.next_call >= conf_bsec.next_call){ 
             rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); //this one is cheating
             //rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); //this one is cheating
             check_rslt_bsec(rslt_bsec, "BSEC_SENSOR_CONTROL");
@@ -532,7 +533,6 @@ int main( void )
                                     print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
                                 }
                                 printf("--------------------------------------------\n");
-                                sleep_ms(50);
                             #endif
                                 before_time = time_us_64();
                                 if(sent_time >= INTERVAL){
@@ -568,7 +568,10 @@ int main( void )
                         saved_time = 0;
                     }
                     saved_time += 1;
+                #ifdef DEBUG
                     printf("Increasing saved time %u\n", saved_time);
+                    sleep_ms(200);
+                #endif
                     after_time = time_us_64();
                     secs = secs - (after_time-before_time)/1000000;
                     //sleep_ms(298000 - (after_time-before_time)/1000);
@@ -583,11 +586,6 @@ int main( void )
             printf("Didn't sleep enough\n");
         }
     #endif
-
-        //set the source to get the oscillator
-        sleep_run_from_xosc();
-        //typical sleep duration is 298 seconds for ULP -> 4 minutes and 58 seconds, need to subtract time from 58 in case of other operations
-        rtc_sleep(secs, mins, 0);
     }
 
     return 0;
@@ -600,20 +598,19 @@ void make_pkt(struct uplink* pkt, bsec_output_t* output, int len){
     for(int i = 0; i<len; i++){
         switch(output[i].sensor_id){
             case BSEC_OUTPUT_STATIC_IAQ:
-                pkt->AQI = output[i].accuracy < 2 ? 0 : (int16_t)(output[i].signal*10);
+                pkt->AQI = output[i].accuracy < 2 ? 0 : (uint16_t)(output[i].signal*10);
                 break;
             case BSEC_OUTPUT_CO2_EQUIVALENT:
-                pkt->CO2 = output[i].accuracy < 2 ? 0 : (int16_t)output[i].signal;
+                pkt->CO2 = output[i].accuracy < 2 ? 0 : (uint16_t)output[i].signal;
                 break;
             case BSEC_OUTPUT_RAW_TEMPERATURE:
                 pkt->temp = (int16_t)(output[i].signal*100);
                 break;
             case BSEC_OUTPUT_RAW_HUMIDITY:
-                pkt->hum = (int16_t)(output[i].signal*100);
+                pkt->hum = (uint16_t)(output[i].signal*100);
                 break;
             case BSEC_OUTPUT_RAW_PRESSURE:
-                pkt->press = ((int16_t)output[i].signal % 10 >= 5) ? (int16_t)(output[i].signal/10)+1 : (int16_t)(output[i].signal/10);
-                pkt->press -= 12; //tolerance adjustment
+                pkt->press = ((uint16_t)output[i].signal % 10 >= 5) ? (uint16_t)(output[i].signal/10)+1 : (uint16_t)(output[i].signal/10);
                 break;
         }
     }
