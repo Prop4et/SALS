@@ -18,17 +18,18 @@ function intToInt(bytes, idx){
     else return x;
 }
 
-
-var bytes = [0x04, 0x00, 0x6c, 0x09, 0xdb, 0x0e, 0xf0, 0x26, 0x00, 0x00, 0x00, 0x00]
+var bytes = [0x04, 0x00, 0xa6, 0x09, 0x22, 0x0f, 0xef, 0x26, 00, 00, 00, 00]
 
 function Decode(fport, bytes, variables){
+    var AQI = returnInt(bytes, 8);
+    var CO2 = returnInt(bytes, 10);
     return{
         "id": returnInt(bytes, 0),
-        "temp": intToInt(bytes, 2),
-        "hum": returnInt(bytes, 4),
-        "press": returnInt(bytes, 6),
-        "AQI": returnInt(bytes, 8),
-        "CO2": returnInt(bytes, 10),
+        "temp": intToInt(bytes, 2)/100,
+        "hum": returnInt(bytes, 4)/100,
+        "press": returnInt(bytes, 6)/100,
+        "AQI": AQI == 0 ? 'nan' : AQI/10,
+        "CO2": CO2 == 0 ? 'nan' : CO2,
     };
 }
 var obj = Decode(0, bytes, 0);
