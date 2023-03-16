@@ -138,7 +138,7 @@ void software_reset()
  */
 static void sleep_callback(){
     rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
-
+    
     //reset procs back to default
     scb_hw->scr = scb_orig;
     clocks_hw->sleep_en0 = clock0_orig;
@@ -526,6 +526,7 @@ int main( void )
                             bsec_output_t output[BSEC_NUMBER_OUTPUTS];
                             memset(output, 0, sizeof(output));
                             rslt_bsec = bsec_do_steps(inputs, n_input, output, &n_output);
+                            lorawan_process();
                             if(rslt_bsec == BSEC_OK){
                             #ifdef DEBUG
                                 printf("------------------Results------------------\n");
