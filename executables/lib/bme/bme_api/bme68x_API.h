@@ -1,5 +1,5 @@
 #include "../bme68x/bme68x_defs.h"
-#include "../bsec/bsec_datatypes.h"
+#include "../bsec2.0/bsec_datatypes.h"
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 /*I2C pinout*/
