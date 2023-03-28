@@ -23,8 +23,8 @@
 #include "pico/lorawan.h"
 #include "../lib/bme/bme68x/bme68x.h"
 #include "../lib/bme/bme_api/bme68x_API.h"
-#include "../lib/bme/bsec/bsec_datatypes.h"
-#include "../lib/bme/bsec/bsec_interface.h"
+#include "../lib/bme/bsec2_4/bsec_datatypes.h"
+#include "../lib/bme/bsec2_4/bsec_interface.h"
 //littlefs
 #include "pico_hal.h"
 
@@ -445,54 +445,27 @@ int main( void )
                 #ifdef DEBUG
                     printf("--------------Forced Mode--------------\n");
                 #endif
-                    rslt_api = bme68x_get_conf(&conf, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_conf");
-                    conf.os_hum = conf_bsec.humidity_oversampling;
-                    conf.os_pres = conf_bsec.pressure_oversampling;
-                    conf.os_temp = conf_bsec.temperature_oversampling;
                     conf.filter = BME68X_FILTER_OFF;
-                    conf.odr = BME68X_ODR_NONE;
-                    rslt_api = bme68x_set_conf(&conf, &bme);
-                    check_rslt_api(rslt_api, "bme68x_set_conf");
-
-                    heatr_conf.enable = BME68X_ENABLE;
-                    heatr_conf.heatr_temp = conf_bsec.heater_temperature;
-                    heatr_conf.heatr_dur = conf_bsec.heater_duration;
-                    rslt_api = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &bme);
-                    check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
-
-                    rslt_api = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme); 
-                    check_rslt_api(rslt_api, "bme68x_set_op_mode");
-                    current_op_mode = BME68X_FORCED_MODE;
-                    break;
-                case BME68X_PARALLEL_MODE:
-                    if (current_op_mode != conf_bsec.op_mode){
-                    #ifdef DEBUG
-                        printf("--------------Parallel Mode--------------\n");
-                    #endif
-                        rslt_api = bme68x_get_conf(&conf, &bme);
-                        check_rslt_api(rslt_api, "bme68x_get_conf");
+                        conf.odr = BME68X_ODR_NONE;
                         conf.os_hum = conf_bsec.humidity_oversampling;
                         conf.os_pres = conf_bsec.pressure_oversampling;
                         conf.os_temp = conf_bsec.temperature_oversampling;
-                        conf.filter = BME68X_FILTER_OFF;
-                        conf.odr = BME68X_ODR_NONE;
                         rslt_api = bme68x_set_conf(&conf, &bme);
                         check_rslt_api(rslt_api, "bme68x_set_conf");
 
+                        /* Check if rslt_api == BME68X_OK, report or handle if otherwise */
                         heatr_conf.enable = BME68X_ENABLE;
-                        heatr_conf.heatr_temp_prof = conf_bsec.heater_temperature_profile;
-                        heatr_conf.heatr_dur_prof = conf_bsec.heater_duration_profile;
-                        heatr_conf.profile_len = 10;
-                        heatr_conf.shared_heatr_dur = 140 - (bme68x_get_meas_dur(BME68X_PARALLEL_MODE, &conf, &bme) / 1000);
-                        current_op_mode = BME68X_PARALLEL_MODE;
-                        rslt_api = bme68x_set_heatr_conf(BME68X_PARALLEL_MODE, &heatr_conf, &bme);
+                        heatr_conf.heatr_temp = conf_bsec.heater_temperature;
+                        heatr_conf.heatr_dur = conf_bsec.heater_duration;
+                        rslt_api = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &bme);
                         check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
-
-                        rslt_api = bme68x_set_op_mode(BME68X_PARALLEL_MODE, &bme); 
-                        check_rslt_api(rslt_api, "bme68x_set_op_mode");
-                        current_op_mode = BME68X_PARALLEL_MODE;
-                    }
+                        
+                        current_op_mode = BME68X_FORCED_MODE;
+                    break;
+                case BME68X_PARALLEL_MODE:
+                    #ifdef DEBUG
+                        printf("--------------Parallel Mode--------------\n");
+                    #endif
                     break;
                 case BME68X_SLEEP_MODE:
                     if (current_op_mode != conf_bsec.op_mode){
@@ -505,16 +478,12 @@ int main( void )
                     break;
             }
 
-            if(conf_bsec.trigger_measurement && conf_bsec.op_mode != BME68X_SLEEP_MODE){
+            if(conf_bsec.trigger_measurement){
                 if(conf_bsec.op_mode == BME68X_FORCED_MODE){
+                    rslt_api = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme);
+                    check_rslt_api(rslt_api, "bme68x_set_op_mode");
                     del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
                     bme.delay_us(del_period, bme.intf_ptr);
-                    rslt_api = bme68x_get_op_mode(&current_op_mode, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_op_mode");
-                    while (current_op_mode == BME68X_FORCED_MODE){
-                        delay_us(5 * 1000, bme.intf_ptr);
-                        rslt_api = bme68x_get_op_mode(&current_op_mode, &bme);
-                    }
                     rslt_api = bme68x_get_data(BME68X_FORCED_MODE, data, &n_fields, &bme);
                     check_rslt_api(rslt_api, "bme68x_get_data");
                     if(data[0].status & BME68X_GASM_VALID_MSK){

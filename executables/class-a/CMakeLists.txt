@@ -14,13 +14,13 @@ endif()
 # pull in common dependencies
 
 add_library(algobsec STATIC IMPORTED)
-set_property(TARGET algobsec PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../lib/bme/bsec/libalgobsec.a)
+set_property(TARGET algobsec PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../lib/bme/bsec2_4/libalgobsec.a)
 
 target_link_libraries(class-a 
     pico_lorawan
     bme68x
     bme_api
-    bsec
+    bsec2_4
     pico_stdlib
     hardware_i2c
     algobsec

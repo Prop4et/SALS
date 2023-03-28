@@ -19,8 +19,8 @@
 #include "pico/lorawan.h"
 #include "../lib/bme/bme68x/bme68x.h"
 #include "../lib/bme/bme_api/bme68x_API.h"
-#include "../lib/bme/bsec/bsec_datatypes.h"
-#include "../lib/bme/bsec/bsec_interface.h"
+#include "../lib/bme/bsec2_4/bsec_datatypes.h"
+#include "../lib/bme/bsec2_4/bsec_interface.h"
 
 //littlefs
 #include "pico_hal.h"
