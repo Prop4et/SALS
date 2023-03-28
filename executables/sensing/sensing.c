@@ -18,8 +18,8 @@
 #include "pico/stdlib.h"
 #include "../lib/bme/bme68x/bme68x.h"
 #include "../lib/bme/bme_api/bme68x_API.h"
-#include "../lib/bme/bsec2.0/bsec_datatypes.h"
-#include "../lib/bme/bsec2.0/bsec_interface.h"
+#include "../lib/bme/bsec2_4/bsec_datatypes.h"
+#include "../lib/bme/bsec2_4/bsec_interface.h"
 
 //littlefs
 #include "pico_hal.h"
@@ -28,7 +28,7 @@
 #include "bme-config.h"
 #include "hardware/watchdog.h"
 
-#define REQUESTED_OUTPUT        7
+#define REQUESTED_OUTPUT        3
 #define BME68X_VALID_DATA       UINT8_C(0xB0)
 #define BSEC_CHECK_INPUT(x, shift)		(x & (1 << (shift-1)))
 /*
@@ -43,7 +43,7 @@ static uint clock1_orig;
 bsec_sensor_configuration_t requested_virtual_sensors[REQUESTED_OUTPUT];
 uint8_t n_requested_virtual_sensors = REQUESTED_OUTPUT;
 // Allocate a struct for the returned physical sensor settings
-bsec_sensor_configuration_t required_sensor_settings[BSEC_MAX_PHYSICAL_SENSOR]; //should i put 1 since i have no shuttle?
+bsec_sensor_configuration_t required_sensor_settings[BSEC_MAX_PHYSICAL_SENSOR]; 
 uint8_t n_required_sensor_settings = BSEC_MAX_PHYSICAL_SENSOR;
 //configuration coming from bsec
 bsec_bme_settings_t conf_bsec;
@@ -92,13 +92,14 @@ void print_results(int id, float signal, int accuracy);
 /**
  * @brief signals if there was an error manipulating the file
  * 
- * @param rslt result of the operation
+ * @param rslt_api result of the operation
  * @param msg message printed out
  */
-void check_fs_error(int rslt, char msg[]);
+void check_fs_error(int rslt_api, char msg[]);
 
-uint8_t processData(int64_t currTimeNs, const struct bme68x_data data, bsec_input_t* inputs){
+uint8_t processData(int64_t currTimeNs, const struct bme68x_data d, bsec_input_t* inputs){
     uint8_t n_input = 0;
+    
     /* Checks all the required sensor inputs, required for the BSEC library for the requested outputs */
     if (conf_bsec.process_data & BSEC_PROCESS_TEMPERATURE)
     {
@@ -107,14 +108,14 @@ uint8_t processData(int64_t currTimeNs, const struct bme68x_data data, bsec_inpu
         inputs[n_input].time_stamp = currTimeNs;
         n_input++;
         
-        inputs[n_input].signal = data.temperature;
+        inputs[n_input].signal = d.temperature;
         inputs[n_input].sensor_id = BSEC_INPUT_TEMPERATURE;
         inputs[n_input].time_stamp = currTimeNs;
         n_input++;
     }
     if (conf_bsec.process_data & BSEC_PROCESS_HUMIDITY)
     {
-        inputs[n_input].signal = data.humidity;
+        inputs[n_input].signal = d.humidity;
         inputs[n_input].sensor_id = BSEC_INPUT_HUMIDITY;
         inputs[n_input].time_stamp = currTimeNs;
         n_input++;
@@ -122,20 +123,20 @@ uint8_t processData(int64_t currTimeNs, const struct bme68x_data data, bsec_inpu
     if (conf_bsec.process_data & BSEC_PROCESS_PRESSURE)
     {
         inputs[n_input].sensor_id = BSEC_INPUT_PRESSURE;
-        inputs[n_input].signal = data.pressure;
+        inputs[n_input].signal = d.pressure;
         inputs[n_input].time_stamp = currTimeNs;
         n_input++;
     }
-    if ((conf_bsec.process_data & BSEC_PROCESS_GAS) && (data.status & BME68X_GASM_VALID_MSK))
+    if ((conf_bsec.process_data & BSEC_PROCESS_GAS) && (d.status & BME68X_GASM_VALID_MSK))
     {
         inputs[n_input].sensor_id = BSEC_INPUT_GASRESISTOR;
-        inputs[n_input].signal = data.gas_resistance;
+        inputs[n_input].signal = d.gas_resistance;
         inputs[n_input].time_stamp = currTimeNs;
         n_input++;
     }
-    if (BSEC_CHECK_INPUT(conf_bsec.process_data, BSEC_INPUT_PROFILE_PART) && (data.status & BME68X_GASM_VALID_MSK)){
+    if (BSEC_CHECK_INPUT(conf_bsec.process_data, BSEC_INPUT_PROFILE_PART) && (d.status & BME68X_GASM_VALID_MSK)){
         inputs[n_input].sensor_id = BSEC_INPUT_PROFILE_PART;
-        inputs[n_input].signal = (conf_bsec.op_mode == BME68X_FORCED_MODE) ? 0 : data.gas_index;
+        inputs[n_input].signal = (conf_bsec.op_mode == BME68X_FORCED_MODE) ? 0 : d.gas_index;
         inputs[n_input].time_stamp = currTimeNs;
         n_input++;
     }
@@ -146,7 +147,6 @@ const char gasName[4][12] = { "Clean Air", "Barley", "Coffee", "Undefined 4"};
 
 int main( void )
 {   
-    
     uint8_t not_sent_loops = 0;
     uint32_t last_saved = 0;
     /*
@@ -162,89 +162,23 @@ int main( void )
     struct bme68x_conf conf;
     struct bme68x_heatr_conf heatr_conf;
     int8_t rslt_api;
+
     uint8_t n_fields = 0;
 
     uint32_t del_period;
     
-    /*
-        INITIALIZE GPIO PINS
-    */
-
     // initialize stdio and wait for USB CDC connect
     stdio_init_all();
     sleep_ms(5000);
-    /*
-        INITIALIZE GPIO PINS
-    */
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, 1);
-    gpio_init(PIN_FORMAT_OUTPUT);
-    gpio_init(PIN_FORMAT_INPUT);
-    gpio_set_dir(PIN_FORMAT_OUTPUT, GPIO_OUT);
-    gpio_set_dir(PIN_FORMAT_INPUT, GPIO_IN);
-    gpio_put(PIN_FORMAT_OUTPUT, 1);
-    
-    sleep_ms(50);
-    bool format = gpio_get(PIN_FORMAT_INPUT);
-#ifdef DEBUG
-    printf("...mounting FS");
-    format ? printf(" and formatting\n") : printf("\n");
-#endif
-    /*
-        little FS set up, it mounts a file system on the flash memory to save the state file
-        if set to true it formats everything
-        if set to false it keeps the files as they were
-    */
-    if (pico_mount(format) != LFS_ERR_OK) {
-    #ifdef DEBUG
-        printf("Error mounting FS\n");
-    #endif
-        blink();
-    }
-    gpio_put(PIN_FORMAT_OUTPUT, 0);
-
-
-    //read state to get the previous state and avoid restarting everything
-    int state_file = pico_open(state_file_name, LFS_O_CREAT | LFS_O_RDONLY );
-    check_fs_error( state_file, "Error opening state file"); 
-    
-    rslt_fs = pico_read(state_file, serialized_state, BSEC_MAX_WORKBUFFER_SIZE*sizeof(uint8_t));
-    check_fs_error(state_file, "Error while reading state file");  
-
-    pico_rewind(state_file);
-    check_fs_error(state_file, "Error while rewinding state file");
-    pico_unmount();
-    sleep_ms(1000);
-    gpio_deinit(PIN_FORMAT_INPUT);
-    gpio_deinit(PIN_FORMAT_OUTPUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, 0);
-#ifdef DEBUG
-    printf("...initialization BSEC\n");
-#endif
-    
-    requested_virtual_sensors[0].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_1;
-    requested_virtual_sensors[0].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    requested_virtual_sensors[1].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_2;
-    requested_virtual_sensors[1].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    requested_virtual_sensors[2].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_3;
-    requested_virtual_sensors[2].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    requested_virtual_sensors[3].sensor_id = BSEC_OUTPUT_RAW_TEMPERATURE;
-    requested_virtual_sensors[3].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    requested_virtual_sensors[4].sensor_id = BSEC_OUTPUT_RAW_HUMIDITY;
-    requested_virtual_sensors[4].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    requested_virtual_sensors[5].sensor_id = BSEC_OUTPUT_RAW_PRESSURE;
-    requested_virtual_sensors[5].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    requested_virtual_sensors[6].sensor_id = BSEC_OUTPUT_RAW_GAS;
-    requested_virtual_sensors[6].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    
     /*
         INITIALIZATION BME CONFIGURATION
     */
 #ifdef DEBUG
     printf("...initialization BME688\n");
 #endif
-    bme_interface_init(&bme, BME68X_I2C_INTF);
+    rslt_api = bme_interface_init(&bme, BME68X_I2C_INTF);
+    check_rslt_api(rslt_api, "bme68x_set_conf");
+
     uint8_t data_id;
 
     //read device id after init to see if everything works for now and to check that the device communicates with I2C
@@ -262,159 +196,148 @@ int main( void )
         printf("Connection valid, DEVICE_ID: %x\n", bme.chip_id);
     #endif
     }
-
+    /*Initialize bme688 sensor*/
+    rslt_api = bme68x_init(&bme);
+    check_rslt_api(rslt_api, "bme68x_init");
+    /*Initialize bsec library*/
     rslt_bsec = bsec_init();
-    check_rslt_bsec(rslt_bsec, "BSEC_INIT");
-    /*
-        INITIALIZATION BSEC LIBRARY
-    */
-#ifdef DEBUG
+    check_rslt_bsec(rslt_bsec, "bsec_init");
     bsec_version_t v;
     bsec_get_version(&v);
     printf("Version: %d.%d.%d.%d\n", v.major, v.minor, v.major_bugfix, v.minor_bugfix);
-#endif
-    if(rslt_fs > 0){
-    #ifdef DEBUG
-        printf("...resuming the state, read %d bytes\n", rslt_fs);
-    #endif
-        //set the state if there is one saved
-        rslt_bsec = bsec_set_state(serialized_state, n_serialized_state, work_buffer, n_work_buffer_size);
-        check_rslt_bsec(rslt_bsec, "BSEC_SET_STATE");
-    }
-    #ifdef DEBUG
-        printf("...loading configuration\n");
-    #endif
-    const uint8_t bsec_config_selectivity[2285] =  {0,0,2,2,189,1,0,0,0,0,0,0,213,8,0,0,52,0,1,0,0,168,19,73,64,49,119,76,0,192,40,72,0,192,40,72,137,65,0,191,205,204,204,190,0,0,64,191,225,122,148,190,10,0,3,0,216,85,0,100,0,0,96,64,23,183,209,56,28,0,2,0,0,244,1,150,0,50,0,0,128,64,0,0,32,65,144,1,0,0,112,65,0,0,0,63,16,0,3,0,10,215,163,60,10,215,35,59,10,215,35,59,13,0,5,0,0,0,0,0,100,254,131,137,87,88,0,9,0,7,240,150,61,0,0,0,0,0,0,0,0,28,124,225,61,52,128,215,63,0,0,160,64,0,0,0,0,0,0,0,0,205,204,12,62,103,213,39,62,230,63,76,192,0,0,0,0,0,0,0,0,145,237,60,191,251,58,64,63,177,80,131,64,0,0,0,0,0,0,0,0,93,254,227,62,54,60,133,191,0,0,64,64,12,0,10,0,0,0,0,0,0,0,0,0,173,6,11,0,0,0,2,100,68,150,190,154,255,134,190,5,27,253,61,62,130,195,62,237,121,98,190,93,20,185,62,122,200,252,61,75,102,59,63,59,31,96,62,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,117,168,172,62,138,254,10,61,250,142,15,191,0,0,0,0,234,194,229,62,43,154,114,188,62,61,201,190,21,112,183,62,97,73,25,62,114,52,246,62,111,223,44,63,216,15,181,190,107,209,92,190,0,0,0,0,27,109,7,190,102,24,157,62,113,195,177,190,235,79,4,62,202,34,123,62,198,185,102,188,23,45,243,62,157,34,164,190,163,248,218,62,0,0,0,0,202,17,28,189,202,38,149,62,147,114,8,191,138,148,154,62,114,183,209,61,108,41,117,62,66,8,107,63,162,199,137,191,12,1,41,189,0,0,0,0,136,134,129,61,115,149,109,190,185,75,22,190,243,111,192,190,63,156,101,190,65,127,5,63,227,154,117,61,63,197,170,190,154,94,120,61,0,0,0,0,195,219,63,62,156,166,174,190,155,50,96,62,49,173,42,190,173,88,105,190,3,17,16,191,248,192,174,190,103,198,248,62,55,149,195,62,0,0,0,0,234,168,41,62,97,164,45,62,118,196,27,63,230,109,12,191,250,69,141,60,30,50,207,190,1,85,123,190,43,69,32,63,24,47,23,63,0,0,0,0,29,93,20,191,59,123,16,190,130,11,166,62,193,141,55,191,49,31,51,191,116,114,85,191,227,53,33,189,116,155,26,63,128,143,184,62,0,0,0,0,254,4,72,191,51,111,30,191,107,145,209,61,92,90,139,190,125,199,45,191,103,69,228,190,170,110,101,191,111,13,228,62,18,172,26,63,0,0,0,0,231,147,90,191,55,170,37,190,15,192,0,191,80,195,25,63,116,32,226,190,89,235,11,188,65,154,196,62,235,100,155,62,227,22,23,63,0,0,0,0,35,126,48,191,30,31,34,191,67,193,144,190,213,22,152,63,229,239,150,62,159,138,163,63,9,192,93,62,57,28,195,60,27,166,253,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,213,62,36,189,59,60,155,191,205,77,215,62,0,0,0,0,163,11,42,62,204,230,207,190,248,108,138,63,0,0,0,0,123,218,143,62,119,11,77,191,62,211,194,189,0,0,0,0,142,245,53,191,87,115,77,63,242,86,132,191,0,0,0,0,182,150,75,191,178,111,19,61,202,42,50,63,0,0,0,0,247,49,212,191,88,209,239,63,10,183,170,191,0,0,0,0,30,157,101,191,15,90,133,63,92,129,170,190,0,0,0,0,207,54,254,63,221,223,11,191,14,142,176,191,0,0,0,0,57,10,56,63,78,54,148,190,189,156,130,191,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,104,42,72,84,253,184,75,7,216,139,75,233,74,59,75,237,139,20,73,38,216,2,73,11,76,237,72,115,227,17,72,206,31,48,72,111,116,63,72,0,0,0,0,0,0,0,0,0,0,0,0,183,90,0,72,244,5,176,75,116,11,133,75,38,180,49,75,159,87,248,72,127,114,216,72,57,173,194,72,179,167,199,71,199,177,235,71,9,81,253,71,0,0,128,63,0,0,128,63,0,0,128,63,0,0,0,87,1,254,0,2,1,5,48,117,100,0,44,1,112,23,151,7,132,3,197,0,92,4,144,1,64,1,64,1,144,1,48,117,48,117,48,117,48,117,100,0,100,0,100,0,48,117,48,117,48,117,100,0,100,0,48,117,48,117,8,7,8,7,8,7,8,7,8,7,100,0,100,0,100,0,100,0,48,117,48,117,48,117,100,0,100,0,100,0,48,117,48,117,100,0,100,0,255,255,255,255,255,255,255,255,255,255,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,255,255,255,255,255,255,255,255,255,255,8,7,8,7,8,7,8,7,8,7,8,7,8,7,8,7,8,7,8,7,8,7,8,7,8,7,8,7,255,255,255,255,255,255,255,255,255,255,112,23,112,23,112,23,112,23,112,23,112,23,112,23,112,23,112,23,112,23,112,23,112,23,112,23,112,23,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,220,5,220,5,220,5,255,255,255,255,255,255,220,5,220,5,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,48,117,0,5,10,5,0,2,0,10,0,30,0,5,0,5,0,5,0,5,0,5,0,5,0,64,1,100,0,100,0,100,0,200,0,200,0,200,0,64,1,64,1,64,1,10,0,0,0,0,50,39,0,0};
+    /*Set configuration and state but it's optional so for now we leave it commented out*/
+    const uint8_t bsec_config_selectivity[1974] = {0,0,4,2,189,1,0,0,0,0,0,0,158,7,0,0,176,0,1,0,0,168,19,73,64,49,119,76,0,192,40,72,0,192,40,72,137,65,0,191,205,204,204,190,0,0,64,191,225,122,148,190,10,0,3,0,0,0,96,64,23,183,209,56,0,0,0,0,0,0,0,0,0,0,0,0,205,204,204,189,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,128,63,82,73,157,188,95,41,203,61,118,224,108,63,155,230,125,63,191,14,124,63,0,0,160,65,0,0,32,66,0,0,160,65,0,0,32,66,0,0,32,66,0,0,160,65,0,0,32,66,0,0,160,65,8,0,2,0,236,81,133,66,16,0,3,0,10,215,163,60,10,215,35,59,10,215,35,59,13,0,5,0,0,0,0,0,100,254,131,137,87,88,0,9,0,7,240,150,61,0,0,0,0,0,0,0,0,28,124,225,61,52,128,215,63,0,0,160,64,0,0,0,0,0,0,0,0,205,204,12,62,103,213,39,62,230,63,76,192,0,0,0,0,0,0,0,0,145,237,60,191,251,58,64,63,177,80,131,64,0,0,0,0,0,0,0,0,93,254,227,62,54,60,133,191,0,0,64,64,12,0,10,0,0,0,0,0,0,0,0,0,13,5,11,0,0,0,2,97,212,217,189,123,211,184,190,246,39,132,190,206,174,109,189,251,75,175,189,235,9,110,62,137,144,36,63,45,8,80,62,144,77,210,188,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,255,226,62,40,255,226,190,0,0,0,0,0,0,0,0,76,31,165,190,5,133,25,190,99,111,16,191,4,102,151,189,223,240,98,190,35,221,96,62,233,47,232,61,154,195,212,62,246,23,39,191,0,0,0,0,208,204,147,189,31,212,43,190,235,102,187,62,96,223,37,190,68,35,41,190,176,189,140,62,167,195,139,189,61,247,59,62,197,184,64,62,0,0,0,0,244,158,240,189,150,236,38,62,220,212,82,190,97,85,116,190,38,131,133,189,226,168,44,62,210,144,202,190,155,4,251,62,111,28,141,62,0,0,0,0,11,238,37,61,214,142,233,189,152,81,180,190,225,50,209,62,51,229,221,62,153,207,193,59,0,126,171,60,100,47,212,62,12,59,73,189,0,0,0,0,109,51,81,189,246,41,221,189,14,235,164,190,106,152,64,62,146,87,64,62,211,57,245,189,85,105,18,61,201,169,91,190,254,132,14,189,0,0,0,0,67,219,100,62,66,204,199,190,41,243,253,189,179,13,234,189,8,59,224,190,29,6,33,190,164,176,176,190,54,130,42,63,55,59,158,189,0,0,0,0,180,113,104,190,83,10,224,190,121,202,43,190,103,45,12,190,15,201,28,190,45,147,66,63,59,77,166,189,87,205,216,189,202,231,80,190,0,0,0,0,61,78,135,190,204,10,107,190,83,139,36,62,193,61,191,62,98,160,17,190,189,93,7,63,134,130,186,61,225,40,223,189,104,13,99,190,0,0,0,0,255,48,206,190,218,86,40,189,67,21,240,190,140,32,28,61,216,22,56,190,200,133,35,190,235,148,37,62,54,40,19,63,59,144,196,190,0,0,0,0,56,41,1,191,129,1,168,190,155,197,38,190,19,130,161,190,172,193,237,189,76,39,22,62,156,12,115,63,153,230,241,59,251,43,182,190,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,128,63,159,49,7,191,186,149,18,63,0,0,0,0,0,0,0,0,24,104,156,190,241,167,235,189,0,0,0,0,0,0,0,0,42,27,1,190,234,50,155,62,0,0,0,0,0,0,0,0,104,247,151,189,48,189,192,62,0,0,0,0,0,0,0,0,223,179,175,190,87,168,137,190,0,0,0,0,0,0,0,0,44,240,99,62,155,142,95,191,0,0,0,0,0,0,0,0,74,14,53,63,152,160,21,191,0,0,0,0,0,0,0,0,115,135,204,62,33,73,249,190,0,0,0,0,0,0,0,0,138,35,98,191,36,48,73,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,2,88,154,50,72,197,13,232,75,9,255,180,75,145,98,131,75,167,32,87,73,174,158,62,73,8,35,45,73,12,163,26,72,242,227,55,72,126,235,71,72,0,0,0,0,0,0,0,0,0,0,0,0,184,21,18,72,175,32,249,75,207,100,195,75,164,64,141,75,117,176,79,73,115,35,54,73,215,19,36,73,36,167,240,71,157,166,10,72,81,152,20,72,0,0,128,63,0,0,128,63,0,0,128,63,0,0,0,88,1,254,0,2,1,5,48,117,100,0,44,1,112,23,151,7,132,3,197,0,92,4,144,1,64,1,64,1,144,1,48,117,48,117,48,117,48,117,100,0,100,0,100,0,48,117,48,117,48,117,100,0,100,0,48,117,48,117,8,7,8,7,8,7,8,7,8,7,100,0,100,0,100,0,100,0,48,117,48,117,48,117,100,0,100,0,100,0,48,117,48,117,100,0,100,0,255,255,255,255,255,255,255,255,255,255,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,44,1,255,255,255,255,255,255,255,255,255,255,112,23,112,23,112,23,112,23,8,7,8,7,8,7,8,7,112,23,112,23,112,23,112,23,112,23,112,23,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,112,23,112,23,112,23,112,23,255,255,255,255,220,5,220,5,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,220,5,220,5,220,5,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,48,117,0,5,10,5,0,2,0,10,0,30,0,5,0,5,0,5,0,5,0,5,0,5,0,64,1,100,0,100,0,100,0,200,0,200,0,200,0,64,1,64,1,64,1,10,1,0,0,0,0,183,167,0,0};
     rslt_bsec = bsec_set_configuration(bsec_config_selectivity, n_serialized_settings_max, work_buffer, n_work_buffer);
     check_rslt_bsec( rslt_bsec, "BSEC_SET_CONFIGURATION");
-
-    sleep_ms(1000);
-    gpio_deinit(PIN_FORMAT_INPUT);
-    gpio_deinit(PIN_FORMAT_OUTPUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, 0);
-
-    // Call bsec_update_subscription() to enable/disable the requested virtual sensors
+    /*//also load state from little fs
+    rslt_bsec = bsec_set_state();
+    check_rslt_bsec(rlst_bsec, "bsec_set_state");*/
+    /*requested_virtual_sensors[0].sensor_id = BSEC_OUTPUT_RAW_TEMPERATURE;
+    requested_virtual_sensors[0].sample_rate = BSEC_SAMPLE_RATE_SCAN;
+    requested_virtual_sensors[1].sensor_id = BSEC_OUTPUT_RAW_HUMIDITY;
+    requested_virtual_sensors[1].sample_rate = BSEC_SAMPLE_RATE_SCAN;
+    requested_virtual_sensors[2].sensor_id = BSEC_OUTPUT_RAW_PRESSURE;
+    requested_virtual_sensors[2].sample_rate = BSEC_SAMPLE_RATE_SCAN;
+    requested_virtual_sensors[3].sensor_id = BSEC_OUTPUT_RAW_GAS;
+    requested_virtual_sensors[3].sample_rate = BSEC_SAMPLE_RATE_SCAN;*/
+    requested_virtual_sensors[0].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_1;
+    requested_virtual_sensors[0].sample_rate = BSEC_SAMPLE_RATE_SCAN;
+    requested_virtual_sensors[1].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_2;
+    requested_virtual_sensors[1].sample_rate = BSEC_SAMPLE_RATE_SCAN;
+    requested_virtual_sensors[2].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_3;
+    requested_virtual_sensors[2].sample_rate = BSEC_SAMPLE_RATE_SCAN;
     rslt_bsec = bsec_update_subscription(requested_virtual_sensors, n_requested_virtual_sensors, required_sensor_settings, &n_required_sensor_settings);
     check_rslt_bsec( rslt_bsec, "BSEC_UPDATE_SUBSCRIPTION");
     uint8_t current_op_mode = BME68X_SLEEP_MODE;
-
-    // loop forever
     uint32_t sleep_time = 0;
     uint64_t start_time = time_us_64();
-    while (1) {
-        uint8_t nFieldsLeft = 0;
-        uint64_t currTimeNs = time_us_64()*1000;
+    
+    //loop
+    while (1){
         current_op_mode = conf_bsec.op_mode;
-        //set to forced mode
+        uint64_t currTimeNs = time_us_64()*1000;
         if(currTimeNs >= conf_bsec.next_call){
             rslt_bsec = bsec_sensor_control(currTimeNs, &conf_bsec);
             check_rslt_bsec(rslt_bsec, "BSEC_SENSOR_CONTROL");
             if(rslt_bsec != BSEC_OK)
                 continue;
-            switch(conf_bsec.op_mode){
-                case BME68X_FORCED_MODE:
-                    printf("--------------Forced Mode--------------\n");
-                    /*rslt_api = bme68x_get_conf(&conf, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_conf");*/
-                    conf.os_hum = conf_bsec.humidity_oversampling;
-                    conf.os_pres = conf_bsec.pressure_oversampling;
-                    conf.os_temp = conf_bsec.temperature_oversampling;
-                    conf.filter = BME68X_FILTER_OFF;
-                    conf.odr = BME68X_ODR_NONE;
-                    rslt_api = bme68x_set_conf(&conf, &bme);
-                    check_rslt_api(rslt_api, "bme68x_set_conf");
-
-                    heatr_conf.enable = BME68X_ENABLE;
-                    heatr_conf.heatr_temp = conf_bsec.heater_temperature;
-                    heatr_conf.heatr_dur = conf_bsec.heater_duration;
-                    rslt_api = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &bme);
-                    check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
-
-                    rslt_api = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme); 
-                    check_rslt_api(rslt_api, "bme68x_set_op_mode");
-                    current_op_mode = BME68X_FORCED_MODE;
-                    break;
-                case BME68X_PARALLEL_MODE:
-                    if (current_op_mode != conf_bsec.op_mode){
-                        printf("--------------Parallel Mode--------------\n");
-                        /*rslt_api = bme68x_get_conf(&conf, &bme);
-                        check_rslt_api(rslt_api, "bme68x_get_conf");*/
+            if(conf_bsec.op_mode != current_op_mode){
+                switch(conf_bsec.op_mode){
+                    case BME68X_FORCED_MODE:
+                        printf("-----------Forced Mode Setup-----------\n");
+                        /*--------------------------*/
+                        conf.filter = BME68X_FILTER_OFF;
+                        conf.odr = BME68X_ODR_NONE;
                         conf.os_hum = conf_bsec.humidity_oversampling;
                         conf.os_pres = conf_bsec.pressure_oversampling;
                         conf.os_temp = conf_bsec.temperature_oversampling;
-                        conf.filter = BME68X_FILTER_OFF;
-                        conf.odr = BME68X_ODR_NONE;
                         rslt_api = bme68x_set_conf(&conf, &bme);
                         check_rslt_api(rslt_api, "bme68x_set_conf");
 
+                        /* Check if rslt_api == BME68X_OK, report or handle if otherwise */
+                        heatr_conf.enable = BME68X_ENABLE;
+                        heatr_conf.heatr_temp = conf_bsec.heater_temperature;
+                        heatr_conf.heatr_dur = conf_bsec.heater_duration;
+                        rslt_api = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &bme);
+                        check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
+                        
+                        current_op_mode = BME68X_FORCED_MODE;
+                    break;
+                    case BME68X_PARALLEL_MODE:
+                        printf("-----------Parallel Mode Setup-----------\n");
+                        conf.filter = BME68X_FILTER_OFF;
+                        conf.odr = BME68X_ODR_NONE;
+                        conf.os_hum = conf_bsec.humidity_oversampling;
+                        conf.os_pres = conf_bsec.pressure_oversampling;
+                        conf.os_temp = conf_bsec.temperature_oversampling;
+                        rslt_api = bme68x_set_conf(&conf, &bme);
+                        check_rslt_api(rslt_api, "bme68x_set_conf");
+
+                        /* Check if rslt_api == BME68X_OK, report or handle if otherwise */
                         heatr_conf.enable = BME68X_ENABLE;
                         heatr_conf.heatr_temp_prof = conf_bsec.heater_temperature_profile;
                         heatr_conf.heatr_dur_prof = conf_bsec.heater_duration_profile;
-                        heatr_conf.profile_len = 10;
+                        heatr_conf.profile_len = conf_bsec.heater_profile_len;
                         heatr_conf.shared_heatr_dur = 140 - (bme68x_get_meas_dur(BME68X_PARALLEL_MODE, &conf, &bme) / 1000);
-                        current_op_mode = BME68X_PARALLEL_MODE;
                         rslt_api = bme68x_set_heatr_conf(BME68X_PARALLEL_MODE, &heatr_conf, &bme);
                         check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
-
-                        rslt_api = bme68x_set_op_mode(BME68X_PARALLEL_MODE, &bme); 
+                        rslt_api = bme68x_set_op_mode(BME68X_PARALLEL_MODE, &bme);
                         check_rslt_api(rslt_api, "bme68x_set_op_mode");
                         current_op_mode = BME68X_PARALLEL_MODE;
-                    }
                     break;
-                case BME68X_SLEEP_MODE:
-                    if (current_op_mode != conf_bsec.op_mode){
-                        printf("--------------Sleep Mode--------------\n");
-                        rslt_api = bme68x_set_op_mode(BME68X_SLEEP_MODE, &bme); 
-                        current_op_mode = BME68X_SLEEP_MODE;
-                    }
+                    case BME68X_SLEEP_MODE:
+                        if (current_op_mode != conf_bsec.op_mode){
+                            printf("--------------Sleep Mode--------------\n");
+                            rslt_api = bme68x_set_op_mode(BME68X_SLEEP_MODE, &bme); 
+                            current_op_mode = BME68X_SLEEP_MODE;
+                        }
                     break;
+                }
             }
 
-            if(conf_bsec.trigger_measurement && conf_bsec.op_mode != BME68X_SLEEP_MODE){
-                if(conf_bsec.op_mode == BME68X_FORCED_MODE){
-                    del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
-                    bme.delay_us(del_period, bme.intf_ptr);
-                    rslt_api = bme68x_get_op_mode(&current_op_mode, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_op_mode");
-                    while (current_op_mode == BME68X_FORCED_MODE){
-                        delay_us(5 * 1000, bme.intf_ptr);
-                        rslt_api = bme68x_get_op_mode(&current_op_mode, &bme);
-                    }
-                    rslt_api = bme68x_get_data(BME68X_FORCED_MODE, data, &n_fields, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_data");
-                    if(data[0].status & BME68X_GASM_VALID_MSK){
-                        uint8_t n_input = 0;
-                        bsec_input_t inputs[BSEC_MAX_PHYSICAL_SENSOR];
-                        n_input = processData(currTimeNs, data[0], inputs);
-                        if(n_input > 0){
-                            uint8_t n_output = REQUESTED_OUTPUT;
-                            bsec_output_t output[BSEC_NUMBER_OUTPUTS];
-                            memset(output, 0, sizeof(output));
-                            rslt_bsec = bsec_do_steps(inputs, n_input, output, &n_output);
-                            if(rslt_bsec == BSEC_OK){
-                                for(uint8_t  i = 0; i < n_output; i++){
-                                #ifdef DEBUG
-                                    print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
-                                #endif
-                                }
-                            }
-                        }
-                    }
-                }
+            if(conf_bsec.trigger_measurement){
+                /* Calculate delay period in microseconds */
+                switch(conf_bsec.op_mode){
+                    case BME68X_FORCED_MODE:
+                        printf("-----------Forced Mode Readings-----------\n");
+                        rslt_api = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme);
+                        check_rslt_api(rslt_api, "bme68x_set_op_mode");
+                        del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
+                        bme.delay_us(del_period, bme.intf_ptr);
 
-                if(conf_bsec.op_mode == BME68X_PARALLEL_MODE){
-                    del_period = bme68x_get_meas_dur(BME68X_PARALLEL_MODE, &conf, &bme) + (heatr_conf.shared_heatr_dur * 1000);
-                    bme.delay_us(del_period, bme.intf_ptr);
-                    
-                    rslt_api = bme68x_get_op_mode(&current_op_mode, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_op_mode");
-
-                    rslt_api = bme68x_get_data(BME68X_PARALLEL_MODE, data, &n_fields, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_data");
-                    for(uint8_t data_idx = 0; data_idx<n_fields; data_idx++){
-                        if(data[data_idx].status & BME68X_GASM_VALID_MSK){
+                        /* Check if rslt_api == BME68X_OK, report or handle if otherwise */
+                        rslt_api = bme68x_get_data(BME68X_FORCED_MODE, data, &n_fields, &bme);
+                        check_rslt_api(rslt_api, "bme68x_get_data");
+                        if(data[0].status & BME68X_GASM_VALID_MSK){
                             uint8_t n_input = 0;
                             bsec_input_t inputs[BSEC_MAX_PHYSICAL_SENSOR];
+                            n_input = processData(currTimeNs, data[0], inputs);
+                            if(n_input > 0){
+                                uint8_t n_output = REQUESTED_OUTPUT;
+                                bsec_output_t output[BSEC_NUMBER_OUTPUTS];
+                                memset(output, 0, sizeof(output));
+                                rslt_bsec = bsec_do_steps(inputs, n_input, output, &n_output);
+                                if(rslt_bsec == BSEC_OK){
+                                    for(uint8_t  i = 0; i < n_output; i++){
+                                    #ifdef DEBUG
+                                        print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
+                                    #endif
+                                    }
+                                }
+                            }
+                        }   
+                    break;
+                    case BME68X_PARALLEL_MODE:
+                        //printf("-----------Parallel Mode Readings-----------\n");
+                        del_period = bme68x_get_meas_dur(BME68X_PARALLEL_MODE, &conf, &bme) + (heatr_conf.shared_heatr_dur * 1000);
+                        bme.delay_us(del_period, bme.intf_ptr);
+                        /* Check if rslt_api == BME68X_OK, report or handle if otherwise */
+                        rslt_api = bme68x_get_data(BME68X_PARALLEL_MODE, data, &n_fields, &bme);
+                        check_rslt_api(rslt_api, "bme68x_get_data");
+                        for(uint8_t data_idx = 0; data_idx<n_fields; data_idx++){
+                            uint8_t n_input = 0;
+                            bsec_input_t inputs[BSEC_MAX_PHYSICAL_SENSOR];
+                            //printf("Gas %f 0x%x\n", data[data_idx].gas_resistance, data[data_idx].status);
                             n_input = processData(currTimeNs, data[data_idx], inputs);
                             if(n_input > 0){
                                 uint8_t n_output = REQUESTED_OUTPUT;
@@ -430,15 +353,14 @@ int main( void )
                                 }
                             }
                         }
-                    }
+                    break;
                 }
             }
-        }
-        if((time_us_64() - start_time) >= 600000000 && conf_bsec.op_mode == BME68X_SLEEP_MODE){
-            save_state_file();
-            start_time = time_us_64();
-        }
+        }  
     }
+
+
+    
     return 0;
 }
 
