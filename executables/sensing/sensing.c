@@ -28,7 +28,7 @@
 #include "bme-config.h"
 #include "hardware/watchdog.h"
 
-#define REQUESTED_OUTPUT        3
+#define REQUESTED_OUTPUT        2
 #define BME68X_VALID_DATA       UINT8_C(0xB0)
 #define BSEC_CHECK_INPUT(x, shift)		(x & (1 << (shift-1)))
 /*
@@ -143,7 +143,7 @@ uint8_t processData(int64_t currTimeNs, const struct bme68x_data d, bsec_input_t
 
     return n_input;
 }
-const char gasName[4][12] = { "Clean Air", "Barley", "Coffee", "Undefined 4"};
+const char gasName[4][12] = { "Clean Air", "Coffee", "Undefined 3", "Undefined 4"};
 
 int main( void )
 {   
@@ -224,8 +224,7 @@ int main( void )
     requested_virtual_sensors[0].sample_rate = BSEC_SAMPLE_RATE_SCAN;
     requested_virtual_sensors[1].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_2;
     requested_virtual_sensors[1].sample_rate = BSEC_SAMPLE_RATE_SCAN;
-    requested_virtual_sensors[2].sensor_id = BSEC_OUTPUT_GAS_ESTIMATE_3;
-    requested_virtual_sensors[2].sample_rate = BSEC_SAMPLE_RATE_SCAN;
+    
     rslt_bsec = bsec_update_subscription(requested_virtual_sensors, n_requested_virtual_sensors, required_sensor_settings, &n_required_sensor_settings);
     check_rslt_bsec( rslt_bsec, "BSEC_UPDATE_SUBSCRIPTION");
     uint8_t current_op_mode = BME68X_SLEEP_MODE;
