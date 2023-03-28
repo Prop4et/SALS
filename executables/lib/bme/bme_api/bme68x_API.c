@@ -100,6 +100,7 @@ int8_t bme_interface_init(struct bme68x_dev *bme, uint8_t intf){
     bme->intf_ptr = &dev_addr;
     bme->amb_temp = 20;
     bme->delay_us = delay_us;
+    return 0;
 }
 
 uint8_t get_dev_addr(){
