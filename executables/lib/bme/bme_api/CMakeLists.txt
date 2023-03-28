@@ -4,7 +4,7 @@ add_library(
     bme68x_API.c
 )
 target_link_libraries(bme_api
-    bsec
+    bsec2_4
     bme68x
     pico_stdlib
     hardware_i2c

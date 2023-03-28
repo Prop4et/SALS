@@ -11,12 +11,12 @@ CTestTestfile.cmake
 _deps
 
 build/
-executables/lib/bme/bsec2.0/*
-executables/lib/bme/bsec2.4/*
-!executables/lib/bme/bsec2.0/CMakeLists.txt
-!executables/lib/bme/bsec2.0/README.md
-!executables/lib/bme/bsec2.4/CMakeLists.txt
-!executables/lib/bme/bsec2.4/README.md
+executables/lib/bme/bsec2_0/*
+executables/lib/bme/bsec2_4/*
+!executables/lib/bme/bsec2_0/CMakeLists.txt
+!executables/lib/bme/bsec2_0/README.md
+!executables/lib/bme/bsec2_4/CMakeLists.txt
+!executables/lib/bme/bsec2_4/README.md
 executables/class-a/lora-config.h
 executables/class-c/lora-config.h
 
