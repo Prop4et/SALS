@@ -430,7 +430,6 @@ int main( void )
     save_state_file();
     while (1) {
         uint8_t nFieldsLeft = 0;
-        uint64_t currTimeNs = time_us_64()*1000;
         current_op_mode = conf_bsec.op_mode;
         //main loop operations
         if(conf_bsec.next_call >= conf_bsec.next_call){ 
@@ -490,7 +489,7 @@ int main( void )
                     if(data[0].status & BME68X_GASM_VALID_MSK){
                         uint8_t n_input = 0;
                         bsec_input_t inputs[BSEC_MAX_PHYSICAL_SENSOR];
-                        n_input = processData(currTimeNs, data[0], inputs);
+                        n_input = processData(conf_bsec.next_call, data[0], inputs);
                         if(n_input > 0){
                             uint8_t n_output = REQUESTED_OUTPUT;
                             bsec_output_t output[BSEC_NUMBER_OUTPUTS];
