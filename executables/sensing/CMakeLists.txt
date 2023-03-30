@@ -23,12 +23,14 @@ target_link_libraries(sensing
     littlefs-lib
     hardware_i2c
     algobsec
+    hardware_rtc
+    hardware_sleep
     pico_runtime  
 )
 
 # enable usb output, disable uart output
-pico_enable_stdio_usb(sensing 1)
-pico_enable_stdio_uart(sensing 0)
+pico_enable_stdio_usb(sensing 0)
+pico_enable_stdio_uart(sensing 1)
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(sensing)
