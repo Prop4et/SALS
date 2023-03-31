@@ -265,9 +265,6 @@ int main( void )
     stdio_init_all();
 #endif
 
-    printf("Clock0: 0x%x\n", clock0_orig);
-    printf("Clock1: 0x%x\n", clock1_orig);
-    printf("Rosc: 0x%x\n", rosc_hw->ctrl);
     /*
         INITIALIZE GPIO PINS
     */
@@ -524,16 +521,17 @@ int main( void )
                                 if(lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) >= 0)
                                     sent_time += 1;
                             #endif
-                                lorawan_process_timeout_ms(4500);
+                                
                                 sent_time = 0;
+                                lorawan_process_timeout_ms(4500);
                                 //window 1
                                 last_message_time = to_ms_since_boot(get_absolute_time());
-                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 1000 && receive_length <= 0){ //window 1 opened together
+                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 1000 && receive_length <= 0){ //window 1 opened 
                                     receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                 }
                                 //window 2
                                 last_message_time = to_ms_since_boot(get_absolute_time());
-                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 2000 && receive_length <= 0){ //window 2 opened together
+                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 2000 && receive_length <= 0){ //window 2 opened 
                                     receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                 }
                                 if (receive_length > -1) {
