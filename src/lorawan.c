@@ -232,7 +232,7 @@ int lorawan_init(const struct lorawan_sx12xx_settings* sx12xx_settings, LoRaMacR
 
     SX126xIoInit();
     LmHandlerParams.Region = region;
-
+    LmHandlerParams.AdrEnable = LORAMAC_HANDLER_ADR_ON;
     if ( LmHandlerInit( &LmHandlerCallbacks, &LmHandlerParams ) != LORAMAC_HANDLER_SUCCESS )
     {
         return -1;
@@ -334,11 +334,7 @@ int lorawan_send_unconfirmed(const void* data, uint8_t data_len, uint8_t app_por
     appData.BufferSize = data_len;
     appData.Buffer = (uint8_t*)data;
 
-    if (LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG) != LORAMAC_HANDLER_SUCCESS) {
-        return -1;
-    }
-
-    return 0;
+    return LmHandlerSend(&appData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
 }
 
 int lorawan_receive(void* data, uint8_t data_len, uint8_t* app_port)
