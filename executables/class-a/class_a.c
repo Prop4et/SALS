@@ -299,7 +299,7 @@ int main( void )
     int state_file = pico_open(state_file_name, LFS_O_CREAT | LFS_O_RDONLY );
     check_fs_error( state_file, "Error opening state file"); 
     
-    rslt_fs = pico_read(state_file, serialized_state, BSEC_MAX_WORKBUFFER_SIZE*sizeof(uint8_t));
+    rslt_fs = pico_read(state_file, serialized_state, BSEC_MAX_STATE_BLOB_SIZE*sizeof(uint8_t));
     check_fs_error(state_file, "Error while reading state file");  
 
     pico_rewind(state_file);
@@ -418,139 +418,153 @@ int main( void )
     double previous_temp = -400;
     double previous_hum = -400;
     double previous_press = -400;
-    uint8_t current_op_mode = 0;
+    uint8_t current_op_mode = BME68X_SLEEP_MODE;
     lorawan_join();
 
     while (!lorawan_is_joined()) {
         lorawan_process();
     }
-    lorawan_process_timeout_ms(10000);
-    conf_bsec.next_call = 0;
+    lorawan_process_timeout_ms(1000);
     // loop forever
     save_state_file();
+    uint32_t last_message_time = 0;
+    LoRaMacStatus_t status;
+    McpsReq_t mcpsReq;
+    LoRaMacTxInfo_t txInfo;
+
     while (1) {
+        lorawan_process_timeout_ms(1000);
         uint8_t nFieldsLeft = 0;
         current_op_mode = conf_bsec.op_mode;
         //main loop operations
-        if(conf_bsec.next_call >= conf_bsec.next_call){ 
-            rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); //this one is cheating
-            //rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); //this one is cheating
-            check_rslt_bsec(rslt_bsec, "BSEC_SENSOR_CONTROL");
-            if(rslt_bsec != BSEC_OK)
-                continue;
-            if(conf_bsec.op_mode != current_op_mode){
-                switch(conf_bsec.op_mode){
-                    case BME68X_FORCED_MODE:
-                    #ifdef DEBUG
-                        printf("--------------Forced Mode--------------\n");
-                    #endif
-                        conf.filter = BME68X_FILTER_OFF;
-                            conf.odr = BME68X_ODR_NONE;
-                            conf.os_hum = conf_bsec.humidity_oversampling;
-                            conf.os_pres = conf_bsec.pressure_oversampling;
-                            conf.os_temp = conf_bsec.temperature_oversampling;
-                            rslt_api = bme68x_set_conf(&conf, &bme);
-                            check_rslt_api(rslt_api, "bme68x_set_conf");
+        rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); //this one is cheating
+        check_rslt_bsec(rslt_bsec, "BSEC_SENSOR_CONTROL");
+        if(rslt_bsec != BSEC_OK)
+            continue;
+        if(conf_bsec.op_mode != current_op_mode){
+            switch(conf_bsec.op_mode){
+                case BME68X_FORCED_MODE:
+                #ifdef DEBUG
+                    printf("--------------Forced Mode--------------\n");
+                #endif
+                    conf.filter = BME68X_FILTER_OFF;
+                        conf.odr = BME68X_ODR_NONE;
+                        conf.os_hum = conf_bsec.humidity_oversampling;
+                        conf.os_pres = conf_bsec.pressure_oversampling;
+                        conf.os_temp = conf_bsec.temperature_oversampling;
+                        rslt_api = bme68x_set_conf(&conf, &bme);
+                        check_rslt_api(rslt_api, "bme68x_set_conf");
 
-                            /* Check if rslt_api == BME68X_OK, report or handle if otherwise */
-                            heatr_conf.enable = BME68X_ENABLE;
-                            heatr_conf.heatr_temp = conf_bsec.heater_temperature;
-                            heatr_conf.heatr_dur = conf_bsec.heater_duration;
-                            rslt_api = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &bme);
-                            check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
-                            
-                            current_op_mode = BME68X_FORCED_MODE;
-                        break;
-                    case BME68X_PARALLEL_MODE:
-                        #ifdef DEBUG
-                            printf("--------------Parallel Mode--------------\n");
-                        #endif
-                        break;
-                    case BME68X_SLEEP_MODE:
-                        if (current_op_mode != conf_bsec.op_mode){
-                        #ifdef DEBUG
-                            printf("--------------Sleep Mode--------------\n");
-                        #endif
-                            rslt_api = bme68x_set_op_mode(BME68X_SLEEP_MODE, &bme); 
-                            current_op_mode = BME68X_SLEEP_MODE;
-                        }
-                        break;
-                }
+                        /* Check if rslt_api == BME68X_OK, report or handle if otherwise */
+                        heatr_conf.enable = BME68X_ENABLE;
+                        heatr_conf.heatr_temp = conf_bsec.heater_temperature;
+                        heatr_conf.heatr_dur = conf_bsec.heater_duration;
+                        rslt_api = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &bme);
+                        check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
+                        current_op_mode = BME68X_FORCED_MODE;
+                    break;
+                case BME68X_PARALLEL_MODE:
+                    #ifdef DEBUG
+                        printf("--------------Parallel Mode--------------\n");
+                    #endif
+                    break;
+                case BME68X_SLEEP_MODE:
+                    if (current_op_mode != conf_bsec.op_mode){
+                    #ifdef DEBUG
+                        printf("--------------Sleep Mode--------------\n");
+                    #endif
+                        rslt_api = bme68x_set_op_mode(BME68X_SLEEP_MODE, &bme); 
+                        current_op_mode = BME68X_SLEEP_MODE;
+                    }
+                    break;
             }
-            
-            if(conf_bsec.trigger_measurement){
-                if(conf_bsec.op_mode == BME68X_FORCED_MODE){
-                    rslt_api = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme);
-                    check_rslt_api(rslt_api, "bme68x_set_op_mode");
-                    del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
-                    bme.delay_us(del_period, bme.intf_ptr);
-                    rslt_api = bme68x_get_data(BME68X_FORCED_MODE, data, &n_fields, &bme);
-                    check_rslt_api(rslt_api, "bme68x_get_data");
-                    if(data[0].status & BME68X_GASM_VALID_MSK){
-                        uint8_t n_input = 0;
-                        bsec_input_t inputs[BSEC_MAX_PHYSICAL_SENSOR];
-                        n_input = processData(conf_bsec.next_call, data[0], inputs);
-                        if(n_input > 0){
-                            uint8_t n_output = REQUESTED_OUTPUT;
-                            bsec_output_t output[BSEC_NUMBER_OUTPUTS];
-                            memset(output, 0, sizeof(output));
-                            rslt_bsec = bsec_do_steps(inputs, n_input, output, &n_output);
-                            lorawan_process();
-                            if(rslt_bsec == BSEC_OK){
+        }
+        
+        if(conf_bsec.trigger_measurement){
+            if(conf_bsec.op_mode == BME68X_FORCED_MODE){
+                rslt_api = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme);
+                check_rslt_api(rslt_api, "bme68x_set_op_mode");
+                del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
+                bme.delay_us(del_period, bme.intf_ptr);
+                rslt_api = bme68x_get_data(BME68X_FORCED_MODE, data, &n_fields, &bme);
+                check_rslt_api(rslt_api, "bme68x_get_data");
+                if(data[0].status & BME68X_GASM_VALID_MSK){
+                    uint8_t n_input = 0;
+                    bsec_input_t inputs[BSEC_MAX_PHYSICAL_SENSOR];
+                    n_input = processData(conf_bsec.next_call, data[0], inputs);
+                    if(n_input > 0){
+                        uint8_t n_output = REQUESTED_OUTPUT;
+                        bsec_output_t output[BSEC_NUMBER_OUTPUTS];
+                        memset(output, 0, sizeof(output));
+                        rslt_bsec = bsec_do_steps(inputs, n_input, output, &n_output);
+                        if(rslt_bsec == BSEC_OK){
+                        #ifdef DEBUG
+                            printf("------------------Results------------------\n");
+                            for(uint8_t  i = 0; i < n_output; i++){
+                                print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
+                            }
+                            printf("--------------------------------------------\n");
+                        #endif
+                            before_time = time_us_64();
+                            if(sent_time >= INTERVAL){
+                                make_pkt(&pkt, output, 6);
+                                secs = 55;
                             #ifdef DEBUG
-                                printf("------------------Results------------------\n");
-                                for(uint8_t  i = 0; i < n_output; i++){
-                                    print_results(output[i].sensor_id, output[i].signal, output[i].accuracy);
+                                printf("\n");
+                                if (lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) < 0) {
+                                    printf("failed!!!\n");
+                                }else{ 
+                                    printf("success!\n");
                                 }
-                                printf("--------------------------------------------\n");
-                            #endif
-                                before_time = time_us_64();
-                                if(sent_time >= INTERVAL){
-                                    make_pkt(&pkt, output, 6);
-                                    secs = 55;
-                                #ifdef DEBUG
-                                    printf("\n");
-                                    if (lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) < 0) {
-                                        sent_time += 1;
-                                        printf("failed!!!\n");
-                                    } else {
-                                        printf("success!\n");
-                                    }
-                                #else
-                                    if(lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) >= 0)
-                                        sent_time += 1;
-                                #endif
-                                    sent_time = 0;
-                                    if (lorawan_process_timeout_ms(3000) == 0) { //downlink windows for class A of 1 and 2 secs
-                                        // check if a downlink message was received
-                                        receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
-                                    }
-                                }else{
+                            #else
+                                if(lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) >= 0)
                                     sent_time += 1;
-                                    printf("Increasing sent time: %u\n", sent_time);
+                            #endif
+                                sent_time = 0;
+                                //window 1
+                                last_message_time = to_ms_since_boot(get_absolute_time());
+                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 1000 && receive_length == 0){ //window 1 opened together
+                                    receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                 }
+                                //window 2
+                                last_message_time = to_ms_since_boot(get_absolute_time());
+                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 2000 && receive_length == 0){ //window 2 opened together
+                                    receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
+                                }
+                                if (receive_length > -1) {
+                                    printf("received a %d byte message on port %d: ", receive_length, receive_port);
+                                    for (int i = 0; i < receive_length; i++) {
+                                        printf("%02x", receive_buffer[i]);
+                                    }
+                                    printf("\n");
+                                }
+                                receive_length = 0;
+                            }else{
+                                sent_time += 1;
+                                printf("Increasing sent time: %u\n", sent_time);
                             }
                         }
                     }
-                    secs = 58;
-                    if(saved_time >= SAVE_INTERVAL){
-                        save_state_file();
-                        saved_time = 0;
-                    }
-                    saved_time += 1;
-                #ifdef DEBUG
-                    printf("Increasing saved time %u\n", saved_time);
-                    sleep_ms(200);
-                #endif
-                    after_time = time_us_64();
-                    secs = secs - (after_time-before_time)/1000000;
-                    //sleep_ms(298000 - (after_time-before_time)/1000);
-                    sleep_run_from_xosc();
-                    rtc_sleep(secs, 4, 0);
                 }
-                //CLASS A sensor should never be in PARALLEL MODE
+                secs = 58;
+                if(saved_time >= SAVE_INTERVAL){
+                    save_state_file();
+                    saved_time = 0;
+                }
+                saved_time += 1;
+            #ifdef DEBUG
+                printf("Increasing saved time %u\n", saved_time);
+                sleep_ms(200);
+            #endif
+            
+                after_time = time_us_64();
+                secs = secs - (after_time-before_time)/1000000;
+                //sleep_ms(298000 - (after_time-before_time)/1000);
+                sleep_run_from_xosc();
+                rtc_sleep(secs, 4, 0);
             }
-        } 
+            //CLASS A sensor should never be in PARALLEL MODE
+        }
     #ifdef DEBUG
         else{
             printf("Didn't sleep enough\n");
