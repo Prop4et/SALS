@@ -137,6 +137,7 @@ void software_reset()
  * 
  */
 static void sleep_callback(){
+
     rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
     
     //reset procs back to default
@@ -228,6 +229,7 @@ int main( void )
     */
     scb_orig = scb_hw->scr;
     clock0_orig = clocks_hw->sleep_en0;
+
     clock1_orig = clocks_hw->sleep_en1;
     //variables holding the time of the sleep in secs, hours and minutes, cannot overflow
     uint8_t secs = 58;
@@ -263,6 +265,9 @@ int main( void )
     stdio_init_all();
 #endif
 
+    printf("Clock0: 0x%x\n", clock0_orig);
+    printf("Clock1: 0x%x\n", clock1_orig);
+    printf("Rosc: 0x%x\n", rosc_hw->ctrl);
     /*
         INITIALIZE GPIO PINS
     */
@@ -433,7 +438,6 @@ int main( void )
     LoRaMacTxInfo_t txInfo;
 
     while (1) {
-        lorawan_process_timeout_ms(1000);
         uint8_t nFieldsLeft = 0;
         current_op_mode = conf_bsec.op_mode;
         //main loop operations
@@ -520,15 +524,16 @@ int main( void )
                                 if(lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) >= 0)
                                     sent_time += 1;
                             #endif
+                                lorawan_process_timeout_ms(4500);
                                 sent_time = 0;
                                 //window 1
                                 last_message_time = to_ms_since_boot(get_absolute_time());
-                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 1000 && receive_length == 0){ //window 1 opened together
+                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 1000 && receive_length <= 0){ //window 1 opened together
                                     receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                 }
                                 //window 2
                                 last_message_time = to_ms_since_boot(get_absolute_time());
-                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 2000 && receive_length == 0){ //window 2 opened together
+                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 2000 && receive_length <= 0){ //window 2 opened together
                                     receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                 }
                                 if (receive_length > -1) {
@@ -556,10 +561,8 @@ int main( void )
                 printf("Increasing saved time %u\n", saved_time);
                 sleep_ms(200);
             #endif
-            
                 after_time = time_us_64();
                 secs = secs - (after_time-before_time)/1000000;
-                //sleep_ms(298000 - (after_time-before_time)/1000);
                 sleep_run_from_xosc();
                 rtc_sleep(secs, 4, 0);
             }
