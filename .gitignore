@@ -19,6 +19,7 @@ executables/lib/bme/bsec2_4/*
 !executables/lib/bme/bsec2_4/README.md
 executables/class-a/lora-config.h
 executables/class-c/lora-config.h
+executables/hello-abp/lora-config.h
 
 .vscode
 putty.log
