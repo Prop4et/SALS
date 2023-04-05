@@ -523,17 +523,8 @@ int main( void )
                             #endif
                                 
                                 sent_time = 0;
-                                lorawan_process_timeout_ms(4500);
-                                //window 1
-                                last_message_time = to_ms_since_boot(get_absolute_time());
-                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 1000 && receive_length <= 0){ //window 1 opened 
-                                    receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
-                                }
-                                //window 2
-                                last_message_time = to_ms_since_boot(get_absolute_time());
-                                while(to_ms_since_boot(get_absolute_time()) - last_message_time < 2000 && receive_length <= 0){ //window 2 opened 
-                                    receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
-                                }
+                                lorawan_process_timeout_ms(3000);
+                                receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                                 if (receive_length > -1) {
                                     printf("received a %d byte message on port %d: ", receive_length, receive_port);
                                     for (int i = 0; i < receive_length; i++) {
