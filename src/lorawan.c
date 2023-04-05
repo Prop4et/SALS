@@ -224,7 +224,7 @@ int lorawan_init(const struct lorawan_sx12xx_settings* sx12xx_settings, LoRaMacR
     SX126x.DIO1 = gpio_dio1;
     SX126x.Reset = gpio_reset;
     SX126x.Spi = spi1_t;
-    SpiInit( &SX126x.Spi, SPI_2, RADIO_MOSI, RADIO_MISO, RADIO_SCLK, NC );
+    SpiInit( &SX126x.Spi, SPI_2, RADIO_MOSI, RADIO_MISO, RADIO_SCLK, RADIO_NSS );
 
     SX126x.Spi.Nss.pin = sx12xx_settings->spi.nss;
     SX126x.Reset.pin = sx12xx_settings->reset;

@@ -63,9 +63,9 @@ uint32_t GpioMcuRead( Gpio_t *obj )
 
 void GpioMcuSetInterrupt( Gpio_t *obj, IrqModes irqMode, IrqPriorities irqPriority, GpioIrqHandler *irqHandler )
 {
-    gpio_set_irq_enabled(obj->pin,GPIO_IRQ_EDGE_RISE,true);
-    obj->IrqHandler = irqHandler;
-    //gpio_set_irq_enabled_with_callback(obj->pin,GPIO_IRQ_EDGE_RISE,true,irqHandler);
+    //gpio_set_irq_enabled(obj->pin,GPIO_IRQ_EDGE_RISE,true);
+    //obj->IrqHandler = irqHandler;
+    gpio_set_irq_enabled_with_callback(obj->pin,GPIO_IRQ_EDGE_RISE,true,(gpio_irq_callback_t)irqHandler);
 
 }
 
