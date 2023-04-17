@@ -525,6 +525,7 @@ int main( void )
                                 sent_time = 0;
                                 lorawan_process_timeout_ms(3000);
                                 receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
+                            #ifdef DEBUG
                                 if (receive_length > -1) {
                                     printf("received a %d byte message on port %d: ", receive_length, receive_port);
                                     for (int i = 0; i < receive_length; i++) {
@@ -532,10 +533,14 @@ int main( void )
                                     }
                                     printf("\n");
                                 }
+                            #endif
                                 receive_length = 0;
                             }else{
                                 sent_time += 1;
+                            #ifdef DEBUG
                                 printf("Increasing sent time: %u\n", sent_time);
+                            #endif
+
                             }
                         }
                     }
@@ -555,13 +560,7 @@ int main( void )
                 sleep_run_from_xosc();
                 rtc_sleep(secs, 4, 0);
             }
-            //CLASS A sensor should never be in PARALLEL MODE
         }
-    #ifdef DEBUG
-        else{
-            printf("Didn't sleep enough\n");
-        }
-    #endif
     }
 
     return 0;
