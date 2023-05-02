@@ -256,7 +256,7 @@ int main( void )
     uint32_t del_period;
 
     uint8_t sent_time = INTERVAL;
-    uint8_t saved_time = 0;
+    uint8_t saved_time = 50;
     uint64_t before_time = 0;
     uint64_t after_time = 0;
         
@@ -428,7 +428,6 @@ int main( void )
     }
     lorawan_process_timeout_ms(1000);
     // loop forever
-    save_state_file();
     uint32_t last_message_time = 0;
     LoRaMacStatus_t status;
     McpsReq_t mcpsReq;
