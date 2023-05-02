@@ -518,8 +518,7 @@ int main( void )
                                     printf("success!\n");
                                 }
                             #else
-                                if(lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) >= 0)
-                                    sent_time += 1;
+                                lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2);
                             #endif
                                 
                                 sent_time = 0;
