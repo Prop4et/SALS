@@ -13,7 +13,7 @@ void blink();
  * @brief function to read I2C 
  * 
  * @param reg register to write to
- * @param buf data buffer
+ * @param buf data buffer holding the values read from the register
  * @param nbytes number of bytes to write
  * @param intf_ptr pointer to store information from the callback
  * @return BME68X_INTF_RET_TYPE 
@@ -27,7 +27,7 @@ BME68X_INTF_RET_TYPE bme_read(uint8_t reg, uint8_t *buf, uint32_t nbytes, void *
  * @brief function to write I2C 
  * 
  * @param reg register to write to
- * @param buf data buffer
+ * @param buf data buffer with eventual data to write
  * @param nbytes number of bytes to write
  * @param intf_ptr pointer to store information from the callback
  * @return BME68X_INTF_RET_TYPE 
@@ -38,7 +38,7 @@ BME68X_INTF_RET_TYPE bme_read(uint8_t reg, uint8_t *buf, uint32_t nbytes, void *
 BME68X_INTF_RET_TYPE bme_write(uint8_t reg, const uint8_t *buf, uint32_t nbytes, void *intf_ptr);
 
 /**
- * @brief signals when there's an error
+ * @brief checks the result of the bme api
  * 
  * @param rslt code 
  * @param api_name message
@@ -54,16 +54,16 @@ void check_rslt_api(int8_t rslt, const char api_name[]);
 void check_rslt_bsec(bsec_library_return_t rslt, const char api_name[]);
 
 /**
- * @brief replaces the interface init by the Bosch API
+ * @brief replaces the interface init by the Bosch API, initializes the sensor structure
  * 
  * @param bme sensor struct
  * @param intf bme68x_intf enum for SPI or I2C
- * @return int8_t 
+ * @return int8_t as defined by the default function
  */
 int8_t bme_interface_init(struct bme68x_dev *bme, uint8_t intf);
 
 /**
- * @brief user defined function for the delay in sampling
+ * @brief sleep functions are hardware dependent, user defined function for the delay in sampling
  * 
  * @param period sampling interval in us
  * @param intf_ptr pointer to store information from the callback

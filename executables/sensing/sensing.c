@@ -1,12 +1,12 @@
-/*
- * Copyright (c) 2021 Arm Limited and Contributors. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+/**
+ * @file sensing.c
+ * @author Francesco Biancucci
+ * @brief small example to check the different operational modes of the bme sensor
+ *          and to verify the correct process for the sensing operation of the bsec library
+ * @version 0.1
+ * @date 2023-05-09
  * 
  * 
- * This example uses ABP to join the LoRaWAN network and then sends a
- * "hello world" uplink message periodically and prints out the
- * contents of any downlink message.
  */
 
 #ifdef DEBUG
@@ -27,8 +27,6 @@
 //littlefs
 #include "pico_hal.h"
 
-// edit with LoRaWAN Node Region and ABP settings 
-#include "bme-config.h"
 #include "hardware/watchdog.h"
 
 #define REQUESTED_OUTPUT        7

@@ -26,21 +26,7 @@
 #define LORAWAN_CHANNEL_MASK            NULL
 
 #ifdef DEBUG 
-    #define INTERVAL          12  /*time between lora send in seconds*/
+    #define INTERVAL          1  /*number of readings to skip before sending, each reading happens in an interval of 5 minutes*/
 #else
-    #define INTERVAL          3600 
+    #define INTERVAL          12 
 #endif
-
-/**
- * @brief utility to compute the time to wait in seconds semi exponentially
- * 
- * @param loops number of loops 
- * @param initial_wait initial waiting time
- * @param increment_factor 
- * @param cap max value reachable
- * @return int32_t the amount of time to wait in seconds
- */
-/*static int32_t semi_exponential_wait_time(int loops, int initial_wait, int increment_factor, int cap){
-    int32_t wait_time = (initial_wait * increment_factor)^loops;
-    return wait_time < cap ? wait_time : cap;
-}*/

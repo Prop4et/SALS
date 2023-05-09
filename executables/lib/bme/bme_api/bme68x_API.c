@@ -5,6 +5,7 @@
 static uint8_t dev_addr;
 static i2c_inst_t *i2c = i2c0;
 
+
 void delay_us(uint32_t period, void *intf_ptr){
     if (period >= 1000)
         sleep_ms(period/1000);
@@ -12,6 +13,9 @@ void delay_us(uint32_t period, void *intf_ptr){
         sleep_ms(1);
 }
 
+/**
+ * @brief blinks the built in led
+ */
 void blink(){
     while (true) {
         gpio_put(PICO_DEFAULT_LED_PIN, 1);
@@ -84,11 +88,12 @@ BME68X_INTF_RET_TYPE bme_read(uint8_t reg, uint8_t *buf, uint32_t nbytes, void *
 int8_t bme_interface_init(struct bme68x_dev *bme, uint8_t intf){
     //i2c interface configuration
     if (intf == BME68X_I2C_INTF){
+        //bme with pin to gnd, i2c uses low address
         dev_addr = BME68X_I2C_ADDR_LOW;
         bme->read = bme_read;
         bme->write = bme_write;
         bme->intf = BME68X_I2C_INTF;
-        
+        //i2c baudrate ad 400KHz
         i2c_init(i2c, 400*1000);
         gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
         gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
@@ -110,3 +115,4 @@ uint8_t get_dev_addr(){
 i2c_inst_t* get_i2c(){
     return i2c;
 }
+
