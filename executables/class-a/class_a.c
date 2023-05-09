@@ -520,7 +520,10 @@ int main( void )
                                 lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2);
                             #endif
                                 
-                                sent_time = 0;
+                                sent_time = 1;
+                                #ifdef DEBUG
+                                    printf("Resetting sent time: %u\n", sent_time);
+                                #endif
                                 lorawan_process_timeout_ms(3000);
                                 receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                             #ifdef DEBUG
@@ -546,13 +549,18 @@ int main( void )
                 secs = 58;
                 if(saved_time >= SAVE_INTERVAL){
                     save_state_file();
-                    saved_time = 0;
+                    saved_time = 1;
+                    #ifdef DEBUG
+                        printf("Resetting saved time %u\n", saved_time);
+                        sleep_ms(200);
+                    #endif
+                }else{
+                    saved_time += 1;
+                #ifdef DEBUG
+                    printf("Increasing saved time %u\n", saved_time);
+                    sleep_ms(200);
+                #endif
                 }
-                saved_time += 1;
-            #ifdef DEBUG
-                printf("Increasing saved time %u\n", saved_time);
-                sleep_ms(200);
-            #endif
                 after_time = time_us_64();
                 secs = secs - (after_time-before_time)/1000000;
                 sleep_run_from_xosc();
