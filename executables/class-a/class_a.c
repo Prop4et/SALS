@@ -690,10 +690,12 @@ void make_pkt(struct uplink* pkt, bsec_output_t* output, int len){
         */
         switch(output[i].sensor_id){
             case BSEC_OUTPUT_STATIC_IAQ:
-                pkt->AQI = output[i].accuracy < 2 ? 0 : (uint16_t)(output[i].signal*10);
+                /*pkt->AQI = output[i].accuracy < 2 ? 0 : (uint16_t)(output[i].signal*10);*/
+                pkt->AQI = (uint16_t)(output[i].signal*10);
                 break;
             case BSEC_OUTPUT_CO2_EQUIVALENT:
-                pkt->CO2 = output[i].accuracy < 2 ? 0 : (uint16_t)output[i].signal;
+                /*pkt->CO2 = output[i].accuracy < 2 ? 0 : (uint16_t)output[i].signal;*/
+                pkt->CO2 = (uint16_t)output[i].signal;
                 break;
             case BSEC_OUTPUT_RAW_TEMPERATURE:
                 pkt->temp = (int16_t)(output[i].signal*100);
