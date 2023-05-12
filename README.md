@@ -10,7 +10,7 @@ The project also includes the [little-fs library](https://github.com/lurk101/lit
 ## How to run
 First of all is adviced to download the project through git clone, that allows for downloading the submodule:
 ```
-git clone --recurse-submodule
+git clone https://github.com/Prop4et/SALS.git --recurse-submodule 
 ```
 Once the repository is cloned there are a few steps needed to set up the environment to compile the code.
 Firstly the environment for the Raspberry Pi Pico needs to be created, here are reported the main steps used to set up the environment through **CMake** and **Visual Studio Code** on windows. On linux based operating systems the steps are the same without the need to install the nmake generator since it should be already set up. For a more in depth set up guide follow the [official website documentation](https://www.raspberrypi.com/documentation/pico-sdk/index_doxygen.html)
