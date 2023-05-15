@@ -32,12 +32,32 @@ function Decode(fport, bytes, variables){
         "CO2": CO2 == 0 ? 'nan' : CO2,
     };
 }
-var obj = Decode(0, bytes, 0);
+
+/*var obj = Decode(0, bytes, 0);
 console.log(obj['id']);
 console.log(obj['temp']);
 console.log(obj['hum']);
 console.log(obj['press']);
 console.log(obj['AQI']);
-console.log(obj['CO2']);
+console.log(obj['CO2']);*/
 
+var obj = {'interval': 5}
 
+function intToBytes(integer) {
+    var b = [];
+    while (integer > 0) {
+      b.unshift(integer & 0xff);
+      integer >>= 8;
+    }
+    return b.reverse();
+}
+  
+function Encode(fPort, obj, variables) {
+    for(var v in obj){
+        if(v === 'interval' && obj[v] > 0){
+            return intToBytes(obj[v])
+        }
+    }
+    return [];
+}
+console.log(Encode(0, obj, 0))

@@ -461,11 +461,6 @@ int main( void )
         software_reset();
 
     }
-#ifdef DEBUG
-    else {
-        printf("Success!\n");
-    }
-#endif
       
     /*initialize state for temp/hum/press with unaccepted values*/
     double previous_temp = -400;
@@ -596,6 +591,7 @@ int main( void )
                             before_time = time_us_64();
                             if(sent_time >= INTERVAL){
                                 make_pkt(&pkt, output, REQUESTED_OUTPUT);
+                                secs = 58;
                             #ifdef DEBUG
                                 printf("\n");
                                 if (lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) < 0) {
@@ -606,7 +602,6 @@ int main( void )
                             #else
                                 lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2);
                             #endif
-                                
                                 sent_time = 1;
                                 #ifdef DEBUG
                                     printf("Resetting sent time: %u\n", sent_time);
@@ -660,6 +655,7 @@ int main( void )
                     baseline for the minutes is 4 since from the BOSCH documentation the standard amount of sleep time for the ULP
                     sample rate is 4 minutes and 58 seconds
                 */
+
                 after_time = time_us_64();
                 secs = secs - (after_time-before_time)/1000000;
                 sleep_run_from_xosc();
