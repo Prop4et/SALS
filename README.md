@@ -79,13 +79,4 @@ The last bit of advice in case of incomplete configuration is to check the probl
 | GPIO 17 | GPIO 16 / formatting filesystem|
 The first time the Raspberry Pi Pico is switched on it should be GPIO 17 - GPIO 16
 
-| Raspberry Pi Pico / Waveshare SX1262 | Adafruit SD breakout |
-| ----------------- | -------------- |
-| 3.3v | 3v | 
-| GND | GND |
-| GPIO 4 | DO |
-| GPIO 5 | CS |
-| GPIO 6 | CLK |
-| GPIO 7 | DI |
-
 
