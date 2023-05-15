@@ -589,9 +589,9 @@ int main( void )
                                 if it's time to send out a packet send it
                             */
                             before_time = time_us_64();
+                            secs = 58;
                             if(sent_time >= INTERVAL){
                                 make_pkt(&pkt, output, REQUESTED_OUTPUT);
-                                secs = 58;
                             #ifdef DEBUG
                                 printf("\n");
                                 if (lorawan_send_unconfirmed(&pkt, sizeof(struct uplink), 2) < 0) {
