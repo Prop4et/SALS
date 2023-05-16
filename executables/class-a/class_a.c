@@ -619,12 +619,18 @@ int main( void )
                                 */
                                 if(receive_length == 2){
                                     current_interval = receive_buffer[1] + (receive_buffer[0] << 8);
+                                #ifdef DEBUG
+                                    printf("Buffer received: least significant %u most significant %u", receive_buffer[1], receive_buffer[0]);
+                                    printf("New interval time: %d", current_interval);
+                                #endif
                                 }
                                 /*
                                     prepare for handling eventual different downlinks
                                 */
                                 else if (receive_length > -1) {
+                                #ifdef DEBUG
                                     printf("received a %d byte message on port %d: ", receive_length, receive_port);
+                                #endif
                                     for (int i = 0; i < receive_length; i++) {
                                         printf("%02x", receive_buffer[i]);
                                     }
