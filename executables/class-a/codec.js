@@ -41,23 +41,28 @@ console.log(obj['press']);
 console.log(obj['AQI']);
 console.log(obj['CO2']);*/
 
-var obj = {'interval': 5}
+var obj = {'interval': 300}
 
 function intToBytes(integer) {
-    var b = [];
-    while (integer > 0) {
-      b.unshift(integer & 0xff);
-      integer >>= 8;
+    var b = [0, 0];
+    /* uint16_t is more than enought to give an interval (uint8_t stayed under a day) */
+    if(integer > 65535)
+        return [];
+    for(var i = 0; i < 2; i++){
+        b[i] = integer & 0xff;
+        integer >>= 8;
     }
     return b.reverse();
 }
   
 function Encode(fPort, obj, variables) {
+    var intervalValue;
     for(var v in obj){
         if(v === 'interval' && obj[v] > 0){
-            return intToBytes(obj[v])
+            intervalValue = intToBytes(obj[v])
         }
     }
-    return [];
+    
+    return intervalValue;
 }
 console.log(Encode(0, obj, 0))

@@ -289,7 +289,7 @@ int main( void )
         this time is then used to scale the sleep time correctly
     */
     uint32_t del_period;
-    uint8_t sent_time = INTERVAL;
+    uint32_t sent_time = INTERVAL;
     uint8_t saved_time = 50;
     uint64_t before_time = 0;
     uint64_t after_time = 0;
@@ -467,6 +467,7 @@ int main( void )
     double previous_hum = -400;
     double previous_press = -400;
     uint8_t current_op_mode = BME68X_SLEEP_MODE;
+    uint8_t current_interval = INTERVAL;
     /*
         using abp it is a pass through function
         but it stays in case of switch to otaa when using a proper 
@@ -590,7 +591,7 @@ int main( void )
                             */
                             before_time = time_us_64();
                             secs = 58;
-                            if(sent_time >= INTERVAL){
+                            if(sent_time >= current_interval){
                                 make_pkt(&pkt, output, REQUESTED_OUTPUT);
                             #ifdef DEBUG
                                 printf("\n");
@@ -614,9 +615,15 @@ int main( void )
                                 receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
                             #ifdef DEBUG
                                 /*
-                                    prepare for downlink handling in the future, if needed
+                                    handle interval time as downlink to change it
                                 */
-                                if (receive_length > -1) {
+                                if(receive_length == 2){
+                                    current_interval = receive_buffer[1] + (receive_buffer[0] << 8);
+                                }
+                                /*
+                                    prepare for handling eventual different downlinks
+                                */
+                                else if (receive_length > -1) {
                                     printf("received a %d byte message on port %d: ", receive_length, receive_port);
                                     for (int i = 0; i < receive_length; i++) {
                                         printf("%02x", receive_buffer[i]);
