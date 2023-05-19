@@ -1,6 +1,6 @@
 #define PIN_FORMAT_OUTPUT   16
 #define PIN_FORMAT_INPUT    17
-#define SAVE_INTERVAL       12 /*number of readings before saving the state, each reading happens in an interval of 5 minutes*/
+#define SAVE_INTERVAL       12*20 /*number of readings before saving the state, each reading happens in an interval of 5 minutes*/
 
 const char* state_file_name = "state_file.config";
 /**

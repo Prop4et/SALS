@@ -467,7 +467,7 @@ int main( void )
     double previous_hum = -400;
     double previous_press = -400;
     uint8_t current_op_mode = BME68X_SLEEP_MODE;
-    uint8_t current_interval = INTERVAL;
+    uint16_t current_interval = INTERVAL;
     /*
         using abp it is a pass through function
         but it stays in case of switch to otaa when using a proper 
@@ -786,17 +786,27 @@ void save_state_file(){
     #ifdef DEBUG
         printf("Error mounting FS\n");
     #endif
-        blink();
+        return;
     }
     //open the file in write mode, no create because it should've been created already
     int state_file = pico_open(state_file_name, LFS_O_CREAT | LFS_O_WRONLY);
-    check_fs_error(state_file, "Error opening state file write"); 
+    //check_fs_error(state_file, "Error opening state file write"); 
+    if(state_file < 0){
+        pico_unmount();
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
     //get the state file
     rslt_bsec = bsec_get_state(0, serialized_state, n_serialized_state_max, work_buffer_state, n_work_buffer_size, &n_serialized_state);
     check_rslt_bsec(rslt_bsec, "BSEC_GET_STATE");
     //write the file and flush
     rslt_fs = pico_write(state_file, serialized_state, BSEC_MAX_STATE_BLOB_SIZE*sizeof(uint8_t));
-    check_fs_error(rslt_fs, "Error writing the file");
+    //check_fs_error(rslt_fs, "Error writing the file");
+    if(rslt_fs < 0){
+        pico_unmount();
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
     pico_fflush(state_file);
     //log the number of bytes written
     int pos = pico_lseek(state_file, 0, LFS_SEEK_CUR);
@@ -805,9 +815,19 @@ void save_state_file(){
 #endif
     //rewind the pointer to the beginning of the file just to be sure
     rslt_fs = pico_rewind(state_file);
-    check_fs_error(state_file, "Error while rewinding state file");
+    if(rslt_fs < 0){
+        pico_unmount();
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
+    //check_fs_error(state_file, "Error while rewinding state file");
     //close the file
     rslt_fs = pico_close(state_file);
+    if(rslt_fs < 0){
+        pico_unmount();
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
     //unmount the fs
     pico_unmount();
     //turn off the led, system can be shut down 
