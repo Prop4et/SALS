@@ -467,7 +467,7 @@ int main( void )
     double previous_hum = -400;
     double previous_press = -400;
     uint8_t current_op_mode = BME68X_SLEEP_MODE;
-    uint8_t current_interval = INTERVAL;
+    uint16_t current_interval = INTERVAL;
     /*
         using abp it is a pass through function
         but it stays in case of switch to otaa when using a proper 
