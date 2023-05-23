@@ -23,8 +23,8 @@ target_link_libraries(hello-abp
 )
 
 # enable usb output, disable uart output
-pico_enable_stdio_usb(hello-abp 0)
-pico_enable_stdio_uart(hello-abp 1)
+pico_enable_stdio_usb(hello-abp 1)
+pico_enable_stdio_uart(hello-abp 0)
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(hello-abp)

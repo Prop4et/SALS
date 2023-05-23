@@ -358,7 +358,7 @@ int main( void )
 #endif
 
     //requested outputs in ULP mode, readings happen in an interval of 5 minutes
-    requested_virtual_sensors[0].sensor_id = BSEC_OUTPUT_STATIC_IAQ; //index air quality
+    requested_virtual_sensors[0].sensor_id = BSEC_OUTPUT_IAQ; //index air quality
     requested_virtual_sensors[0].sample_rate = BSEC_SAMPLE_RATE_ULP;
     requested_virtual_sensors[1].sensor_id = BSEC_OUTPUT_RAW_TEMPERATURE; //temperature
     requested_virtual_sensors[1].sample_rate = BSEC_SAMPLE_RATE_ULP;
@@ -698,7 +698,7 @@ void make_pkt(struct uplink* pkt, bsec_output_t* output, int len){
                                      the actual value that is sent out is in the form of daPa
         */
         switch(output[i].sensor_id){
-            case BSEC_OUTPUT_STATIC_IAQ:
+            case BSEC_OUTPUT_IAQ:
                 /*pkt->AQI = output[i].accuracy < 2 ? 0 : (uint16_t)(output[i].signal*10);*/
                 pkt->AQI = (uint16_t)(output[i].signal*10);
                 break;
