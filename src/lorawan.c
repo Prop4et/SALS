@@ -428,7 +428,7 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
             params->DevAddr = 0;
 
             for (int i = 0; i < 4; i++) {
-                int b;
+                uint8_t b;
 
                 sscanf(device_address + i * 2, "%2hhx", &b);
 
@@ -450,9 +450,9 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
         uint8_t deviceEui[8];
 
         for (int i = 0; i < 8; i++) {
-            int b;
+            uint8_t b;
 
-            sscanf(device_eui + i * 2, "%2x", &b);
+            sscanf(device_eui + i * 2, "%2hhx", &b);
 
             deviceEui[i] = b;
         }
@@ -467,9 +467,9 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
         uint8_t joinEui[8];
 
         for (int i = 0; i < 8; i++) {
-            int b;
+            uint8_t b;
 
-            sscanf(app_eui + i * 2, "%2x", &b);
+            sscanf(app_eui + i * 2, "%2hhx", &b);
 
             joinEui[i] = b;
         }
@@ -484,9 +484,9 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
         uint8_t appKey[16];
 
         for (int i = 0; i < 16; i++) {
-            int b;
+            uint8_t b;
 
-            sscanf(app_key + i * 2, "%2x", &b);
+            sscanf(app_key + i * 2, "%2hhx", &b);
 
             appKey[i] = b;
         }
@@ -504,15 +504,15 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
         uint8_t appSessionKey[16];
 
         for (int i = 0; i < 16; i++) {
-            int b;
+            uint8_t b;
 
-            sscanf(app_session_key + i * 2, "%2x", &b);
+            sscanf(app_session_key + i * 2, "%2hhx", &b);
 
             appSessionKey[i] = b;
         }
-
         mibReq.Type = MIB_APP_S_KEY;
         mibReq.Param.AppSKey = appSessionKey;
+
         LoRaMacMibSetRequestConfirm( &mibReq );
     }
 
@@ -520,13 +520,12 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
         uint8_t networkSessionKey[16];
 
         for (int i = 0; i < 16; i++) {
-            int b;
+            uint8_t b;
 
-            sscanf(network_session_key + i * 2, "%2x", &b);
+            sscanf(network_session_key + i * 2, "%2hhx", &b);
 
             networkSessionKey[i] = b;
         }
-
         mibReq.Type = MIB_F_NWK_S_INT_KEY;
         mibReq.Param.FNwkSIntKey = networkSessionKey;
         LoRaMacMibSetRequestConfirm( &mibReq );
@@ -544,7 +543,7 @@ static void OnNetworkParametersChange( CommissioningParams_t* params )
         uint16_t channelMask[6];
 
         for (int i = 0; i < 6; i++) {
-            int b[2];
+            uint8_t b[2];
 
             sscanf(channel_mask + i * 4 + 0, "%2x", &b[0]);
             sscanf(channel_mask + i * 4 + 2, "%2x", &b[1]);

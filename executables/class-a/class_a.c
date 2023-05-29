@@ -430,6 +430,7 @@ int main( void )
     check_rslt_bsec( rslt_bsec, "BSEC_UPDATE_SUBSCRIPTION");  
 
     //if debug sets lorawan debug messages to be printed
+
 #ifdef DEBUG
     lorawan_debug(true);
     printf("Pico LoRaWAN - lora and bme sensor\n\n");
@@ -464,7 +465,6 @@ int main( void )
     double previous_press = -400;
     uint8_t current_op_mode = BME68X_SLEEP_MODE;
     uint16_t current_interval = INTERVAL;
-    printf("Interval %lu", INTERVAL);
 
     /*
         using abp it is a pass through function
