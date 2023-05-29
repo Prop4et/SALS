@@ -18,7 +18,6 @@ function intToInt(bytes, idx){
     else return x;
 }
 
-var bytes = [0x04, 0x00, 0xa6, 0x09, 0x22, 0x0f, 0xef, 0x26, 00, 00, 00, 00]
 
 function Decode(fport, bytes, variables){
     var AQI = returnInt(bytes, 8);
@@ -32,6 +31,7 @@ function Decode(fport, bytes, variables){
         "CO2": CO2 == 0 ? 'nan' : CO2,
     };
 }
+var bytes = [0x04, 0x00, 0xa6, 0x09, 0x22, 0x0f, 0xef, 0x26, 00, 00, 00, 00]
 
 /*var obj = Decode(0, bytes, 0);
 console.log(obj['id']);

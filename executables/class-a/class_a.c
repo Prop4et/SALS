@@ -166,9 +166,7 @@ static void sleep_callback(){
 
     //reset clocks
     clocks_init();
-#ifdef DEBUG //no need if no output
     stdio_uart_init();
-#endif
 }
 
 /**
@@ -289,15 +287,13 @@ int main( void )
         this time is then used to scale the sleep time correctly
     */
     uint32_t del_period;
-    uint32_t sent_time = INTERVAL;
-    uint8_t saved_time = 50;
+    uint16_t sent_time = INTERVAL;
+    uint8_t saved_time = SAVE_INTERVAL;
     uint64_t before_time = 0;
     uint64_t after_time = 0;
         
     // initialize stdio and wait for USB CDC connect
-#ifdef DEBUG   
     stdio_init_all();
-#endif
 
     /*
         INITIALIZE GPIO PINS
@@ -468,6 +464,8 @@ int main( void )
     double previous_press = -400;
     uint8_t current_op_mode = BME68X_SLEEP_MODE;
     uint16_t current_interval = INTERVAL;
+    printf("Interval %lu", INTERVAL);
+
     /*
         using abp it is a pass through function
         but it stays in case of switch to otaa when using a proper 
@@ -611,8 +609,15 @@ int main( void )
                                     process LoRaWAN events, give time to the irq do go down before deep sleep, otherwise it bugs and 
                                     the next time it tries to send the irq results busy, then check for eventual downlinks
                                 */
-                                lorawan_process_timeout_ms(3000);
+                                lorawan_process_timeout_ms(4500);
                                 receive_length = lorawan_receive(receive_buffer, sizeof(receive_buffer), &receive_port);
+                                if(receive_length == 2){
+                                    current_interval = receive_buffer[1] + (receive_buffer[0] << 8);
+                                #ifdef DEBUG
+                                    printf("Buffer received: least significant %u most significant %u", receive_buffer[1], receive_buffer[0]);
+                                    printf("New interval time: %d", current_interval);
+                                #endif
+                                }
                             #ifdef DEBUG
                                 /*
                                     handle interval time as downlink to change it
@@ -668,7 +673,6 @@ int main( void )
                     baseline for the minutes is 4 since from the BOSCH documentation the standard amount of sleep time for the ULP
                     sample rate is 4 minutes and 58 seconds
                 */
-
                 after_time = time_us_64();
                 secs = secs - (after_time-before_time)/1000000;
                 sleep_run_from_xosc();
