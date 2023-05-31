@@ -331,7 +331,7 @@ int main( void )
     }
     gpio_put(PIN_FORMAT_OUTPUT, 0);
     
-    int log_file = pico_open(log_file_name, LFS_O_RDONLY);
+    int log_file = pico_open(log_file_name, LFS_O_CREAT | LFS_O_RDONLY);
     check_fs_error( log_file, "Error opening log file"); 
     
     char log[256];
