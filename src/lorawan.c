@@ -59,7 +59,7 @@
  *
  * \remark Please note that LORAWAN_DEFAULT_DATARATE is used only when ADR is disabled 
  */
-#define LORAWAN_DEFAULT_DATARATE                    DR_0
+#define LORAWAN_DEFAULT_DATARATE                    DR_2
 
 /*!
  * LoRaWAN confirmed messages
