@@ -25,26 +25,37 @@ void blink(){
     }
 }
 
-void check_rslt_api(int8_t rslt, const char api_name[])
+void check_rslt_api(int8_t rslt, const char api_name[], void (*func_ptr)(char*, uint32_t))
 {
     if(rslt != BME68X_OK){
+        char log[256];
         if(rslt < BSEC_OK){
             printf("BME68X error code: %d on function %s\n", rslt, api_name);
+            sprintf(log, "BME68X error code: %d on function %s\n", rslt, api_name);
+            if(func_ptr != NULL) 
+                func_ptr(log, strlen(log)+1);
             blink();
         }else{
             printf("BME68X warning code: %d on function %s\n", rslt, api_name);
+            sprintf(log, "BME68X warning code: %d on function %s\n", rslt, api_name);
         }
     }
 }
 
-void check_rslt_bsec(bsec_library_return_t rslt, const char api_name[]){
+void check_rslt_bsec(bsec_library_return_t rslt, const char api_name[], void (*func_ptr)(char*, uint32_t)){
     if(rslt != BSEC_OK){
+        char log[256];
         if(rslt < BSEC_OK){
             printf("BSEC error code: %d on function %s\n", rslt, api_name);
+            sprintf(log, "BME68X error code: %d on function %s\n", rslt, api_name);
+            if(func_ptr != NULL) 
+                func_ptr(log, strlen(log)+1);
             blink();
         }else{
             printf("BSEC warning code: %d on function %s\n", rslt, api_name);
+            sprintf(log, "BME68X warning code: %d on function %s\n", rslt, api_name);
         }
+        
     }
 }
 

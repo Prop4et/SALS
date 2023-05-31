@@ -2,6 +2,7 @@
 #include "../bsec2_4/bsec_datatypes.h"
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
+#include <string.h>
 /*I2C pinout*/
 #define SDA_PIN 8
 #define SCL_PIN 9
@@ -43,7 +44,7 @@ BME68X_INTF_RET_TYPE bme_write(uint8_t reg, const uint8_t *buf, uint32_t nbytes,
  * @param rslt code 
  * @param api_name message
  */
-void check_rslt_api(int8_t rslt, const char api_name[]);
+void check_rslt_api(int8_t rslt, const char api_name[], void (*func_ptr)(char*, uint32_t));
 
 /**
  * @brief checks the result of the bsec operations
@@ -51,7 +52,7 @@ void check_rslt_api(int8_t rslt, const char api_name[]);
  * @param rslt code
  * @param api_name message
 */
-void check_rslt_bsec(bsec_library_return_t rslt, const char api_name[]);
+void check_rslt_bsec(bsec_library_return_t rslt, const char api_name[], void (*func_ptr)(char*, uint32_t));
 
 /**
  * @brief replaces the interface init by the Bosch API, initializes the sensor structure

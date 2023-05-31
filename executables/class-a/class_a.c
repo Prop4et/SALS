@@ -330,6 +330,14 @@ int main( void )
         blink();
     }
     gpio_put(PIN_FORMAT_OUTPUT, 0);
+    
+    int log_file = pico_open(log_file_name, LFS_O_RDONLY);
+    check_fs_error( log_file, "Error opening log file"); 
+    
+    char log[256];
+    int rslt_log = pico_read(log_file, log, 256);
+    if(rslt_log > 0)
+        printf("LOG: %s\n", log);
 
 
     //read state to get the previous state and avoid restarting everything
@@ -341,9 +349,7 @@ int main( void )
 
     pico_rewind(state_file);
     check_fs_error(state_file, "Error while rewinding state file");
-    //unmount operation is always executed, so in case of sudden shut down data isn't lost
-    pico_unmount();
-    sleep_ms(1000);
+    
     //deinit pins, they are no longer used until the device is restarted
     gpio_deinit(PIN_FORMAT_INPUT);
     gpio_deinit(PIN_FORMAT_OUTPUT);
@@ -402,13 +408,13 @@ int main( void )
         initialize the structure with all the parameters by reading from the registers
     */
     rslt_api = bme68x_init(&bme);
-    check_rslt_api( rslt_api, "INIT");
+    check_rslt_api( rslt_api, "INIT", NULL);
 
     /*
         INITIALIZATION BSEC LIBRARY
     */
     rslt_bsec = bsec_init();
-    check_rslt_bsec(rslt_bsec, "BSEC_INIT");
+    check_rslt_bsec(rslt_bsec, "BSEC_INIT", NULL);
 
     /*
         reading from the file returned bytes, so there is a state file saved
@@ -419,7 +425,7 @@ int main( void )
     #endif
         //set the state if there is one saved
         rslt_bsec = bsec_set_state(serialized_state, n_serialized_state, work_buffer_state, n_work_buffer_size);
-        check_rslt_bsec(rslt_bsec, "BSEC_SET_STATE");
+        check_rslt_bsec(rslt_bsec, "BSEC_SET_STATE", NULL);
     }    
     /*
         Set configuration is skipped for class a
@@ -427,7 +433,7 @@ int main( void )
     
     // Call bsec_update_subscription() to enable/disable the requested virtual sensors
     rslt_bsec = bsec_update_subscription(requested_virtual_sensors, n_requested_virtual_sensors, required_sensor_settings, &n_required_sensor_settings);
-    check_rslt_bsec( rslt_bsec, "BSEC_UPDATE_SUBSCRIPTION");  
+    check_rslt_bsec( rslt_bsec, "BSEC_UPDATE_SUBSCRIPTION", NULL);  
 
     //if debug sets lorawan debug messages to be printed
 
@@ -486,8 +492,9 @@ int main( void )
             using deep sleep stops the internal clock so the amount of time waiting in sleep cannot be measured
             with the clocks
         */        
+        //rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); 
         rslt_bsec = bsec_sensor_control(conf_bsec.next_call, &conf_bsec); 
-        check_rslt_bsec(rslt_bsec, "BSEC_SENSOR_CONTROL");
+        check_rslt_bsec(rslt_bsec, "BSEC_SENSOR_CONTROL", save_log_file);
         if(rslt_bsec != BSEC_OK)
             continue;
         if(conf_bsec.op_mode != current_op_mode){
@@ -508,7 +515,7 @@ int main( void )
                         conf.os_pres = conf_bsec.pressure_oversampling;
                         conf.os_temp = conf_bsec.temperature_oversampling;
                         rslt_api = bme68x_set_conf(&conf, &bme);
-                        check_rslt_api(rslt_api, "bme68x_set_conf");
+                        check_rslt_api(rslt_api, "bme68x_set_conf", save_log_file);
 
                         /*
                             sets the configuration for the heater
@@ -517,7 +524,7 @@ int main( void )
                         heatr_conf.heatr_temp = conf_bsec.heater_temperature;
                         heatr_conf.heatr_dur = conf_bsec.heater_duration;
                         rslt_api = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &bme);
-                        check_rslt_api(rslt_api, "bme68x_set_heatr_conf");
+                        check_rslt_api(rslt_api, "bme68x_set_heatr_conf", save_log_file);
 
                         current_op_mode = BME68X_FORCED_MODE;
                     break;
@@ -551,14 +558,14 @@ int main( void )
         if(conf_bsec.trigger_measurement){
             if(conf_bsec.op_mode == BME68X_FORCED_MODE){
                 rslt_api = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme);
-                check_rslt_api(rslt_api, "bme68x_set_op_mode");
+                check_rslt_api(rslt_api, "bme68x_set_op_mode", save_log_file);
 
                 del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
                 bme.delay_us(del_period, bme.intf_ptr);
                 
                 //get raw data
                 rslt_api = bme68x_get_data(BME68X_FORCED_MODE, data, &n_fields, &bme);
-                check_rslt_api(rslt_api, "bme68x_get_data");
+                check_rslt_api(rslt_api, "bme68x_get_data", save_log_file);
                 /*
                     in forced mode only data[0] is written, if the readings are valid proceed to pass them to the library
                 */
@@ -776,6 +783,40 @@ uint8_t processData(int64_t currTimeNs, const struct bme68x_data data, bsec_inpu
     return n_input;
 }
 
+void save_log_file(char* string, lfs_size_t len){
+    gpio_put(PICO_DEFAULT_LED_PIN, 1);
+    #ifdef DEBUG
+        printf("...Saving the log file\n");
+    #endif
+    //open the file in write mode, no create because it should've been created already
+    int log_file = pico_open(log_file_name, LFS_O_CREAT | LFS_O_WRONLY);
+    if(log_file < 0){
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
+    rslt_fs = pico_write(log_file, string, len);
+    if(rslt_fs < 0){
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
+    pico_fflush(log_file);
+    //rewind the pointer to the beginning of the file just to be sure
+    rslt_fs = pico_rewind(log_file);
+    if(rslt_fs < 0){
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
+    //close the file
+    rslt_fs = pico_close(log_file);
+    if(rslt_fs < 0){
+        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        return;
+    }
+    //turn off the led, system can be shut down 
+    gpio_put(PICO_DEFAULT_LED_PIN, 0);
+    sleep_ms(200);
+}
+
 /**
  * @brief save the state file on the filesystem
  * 
@@ -786,28 +827,20 @@ void save_state_file(){
         printf("...Saving the file\n");
     #endif
         //mount the fs 
-    if (pico_mount(true) != LFS_ERR_OK) {
-    #ifdef DEBUG
-        printf("Error mounting FS\n");
-    #endif
-        return;
-    }
+    
     //open the file in write mode, no create because it should've been created already
     int state_file = pico_open(state_file_name, LFS_O_CREAT | LFS_O_WRONLY);
     //check_fs_error(state_file, "Error opening state file write"); 
     if(state_file < 0){
-        pico_unmount();
         gpio_put(PICO_DEFAULT_LED_PIN, 0);
         return;
     }
     //get the state file
     rslt_bsec = bsec_get_state(0, serialized_state, n_serialized_state_max, work_buffer_state, n_work_buffer_size, &n_serialized_state);
-    check_rslt_bsec(rslt_bsec, "BSEC_GET_STATE");
+    check_rslt_bsec(rslt_bsec, "BSEC_GET_STATE", save_log_file);
     //write the file and flush
     rslt_fs = pico_write(state_file, serialized_state, BSEC_MAX_STATE_BLOB_SIZE*sizeof(uint8_t));
-    //check_fs_error(rslt_fs, "Error writing the file");
     if(rslt_fs < 0){
-        pico_unmount();
         gpio_put(PICO_DEFAULT_LED_PIN, 0);
         return;
     }
@@ -815,28 +848,23 @@ void save_state_file(){
     //log the number of bytes written
     int pos = pico_lseek(state_file, 0, LFS_SEEK_CUR);
 #ifdef DEBUG
-    printf("Written %d byte for file %s\n", pos, state_file);
+    printf("Written %d byte for file %s\n", pos, state_file_name);
 #endif
     //rewind the pointer to the beginning of the file just to be sure
     rslt_fs = pico_rewind(state_file);
     if(rslt_fs < 0){
-        pico_unmount();
         gpio_put(PICO_DEFAULT_LED_PIN, 0);
         return;
     }
-    //check_fs_error(state_file, "Error while rewinding state file");
     //close the file
     rslt_fs = pico_close(state_file);
     if(rslt_fs < 0){
-        pico_unmount();
         gpio_put(PICO_DEFAULT_LED_PIN, 0);
         return;
     }
-    //unmount the fs
-    pico_unmount();
     //turn off the led, system can be shut down 
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
-    sleep_us(5);
+    sleep_ms(200);
 }
 
 //utility function to print out results and accuracy if if matters
